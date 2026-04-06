@@ -219,10 +219,6 @@ input[type="file"]{display:none}
       <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品组别</div>
       <div class="card" id="stockGroupList"></div>
     </div>
-    <div id="stock-category-view" style="display:none">
-      <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品类别</div>
-      <div class="card" id="stockCategoryList"></div>
-    </div>
     <div id="stock-items-view" style="display:none">
       <div class="search-wrap" style="margin-top:10px">
         <span class="search-icon">🔍</span>
@@ -390,7 +386,7 @@ function handleBack() {
   if (!S.pageStack.length) document.getElementById('backBtn').style.display = 'none';
   if (prev.id === 'orders')  renderOrderList();
   if (prev.id === 'reports') renderReportList();
-  if (prev.id === 'stock') { renderStockGroups(); document.getElementById('stock-group-view').style.display='block'; document.getElementById('stock-category-view').style.display='none'; document.getElementById('stock-items-view').style.display='none'; }
+  if (prev.id === 'stock') { renderStockGroups(); document.getElementById('stock-group-view').style.display='block'; document.getElementById('stock-items-view').style.display='none'; }
   window.scrollTo(0, 0);
 }
 function switchMainTab(tab) {
@@ -671,7 +667,6 @@ async function loadStock() {
 
 function renderStockGroups() {
   document.getElementById('stock-group-view').style.display = 'block';
-  document.getElementById('stock-category-view').style.display = 'none';
   document.getElementById('stock-items-view').style.display = 'none';
 
   if (!stockState.items.length) {
@@ -704,44 +699,21 @@ function openStockGroup(encodedGroup) {
   const group = decodeURIComponent(encodedGroup);
   stockState.group = group;
   stockState.category = null;
-  const cats = {};
-  stockState.items.filter(i => i.group === group).forEach(i => { cats[i.category] = (cats[i.category] || 0) + 1; });
-  document.getElementById('stock-group-view').style.display = 'none';
-  document.getElementById('stock-category-view').style.display = 'block';
-  document.getElementById('stock-items-view').style.display = 'none';
-  document.getElementById('topbarTitle').textContent = group;
-  document.getElementById('backBtn').style.display = 'flex';
-  S.pageStack.push({ id: 'stock', title: '库存', sub: null });
-  document.getElementById('stockCategoryList').innerHTML = '<div class="card">' +
-    Object.entries(cats).sort((a,b) => b[1]-a[1]).map(([c, count]) =>
-      `<div class="card-row" onclick="openStockCategory('${encodeURIComponent(c)}')">
-        <div style="flex:1">
-          <div style="font-size:15px;font-weight:500;color:var(--text)">${c}</div>
-          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${count} 个商品</div>
-        </div>
-        <span style="color:var(--text-3);font-size:18px">›</span>
-      </div>`).join('') + '</div>';
-  window.scrollTo(0,0);
-}
-
-function openStockCategory(encodedCat) {
-  const cat = decodeURIComponent(encodedCat);
-  stockState.category = cat;
   stockState.searchQuery = '';
   document.getElementById('stockSearch').value = '';
   document.getElementById('stockSearchClear').style.display = 'none';
-  document.getElementById('stock-category-view').style.display = 'none';
+  document.getElementById('stock-group-view').style.display = 'none';
   document.getElementById('stock-items-view').style.display = 'block';
-  document.getElementById('topbarTitle').textContent = cat;
-  S.pageStack.push({ id: 'stock-cat', title: stockState.group, sub: null });
+  document.getElementById('topbarTitle').textContent = group;
   document.getElementById('backBtn').style.display = 'flex';
+  S.pageStack.push({ id: 'stock', title: '库存', sub: null });
   renderStockItems();
-  window.scrollTo(0,0);
+  window.scrollTo(0, 0);
 }
 
 function renderStockItems() {
   const q = stockState.searchQuery.toLowerCase();
-  let items = stockState.items.filter(i => i.group === stockState.group && i.category === stockState.category);
+  let items = stockState.items.filter(i => i.group === stockState.group);
   if (q) items = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
   document.getElementById('stockSearchMeta').textContent = q ? `找到 ${items.length} 个商品` : `共 ${items.length} 个商品`;
   if (!items.length) {
