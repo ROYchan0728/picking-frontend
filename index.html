@@ -370,12 +370,21 @@ async function loadAll() {
 }
 
 // ─── SSE REAL-TIME ───────────────────────────────────────
+let _sseInstance = null;
+
 function connectSSE() {
+  if (_sseInstance) { try { _sseInstance.close(); } catch {} _sseInstance = null; }
   const es = new EventSource(API + '/api/events');
+  _sseInstance = es;
   const dot = document.getElementById('syncDot');
 
   es.onopen = () => dot.className = 'sync-dot live';
-  es.onerror = () => { dot.className = 'sync-dot error'; setTimeout(connectSSE, 4000); es.close(); };
+  es.onerror = () => {
+    dot.className = 'sync-dot error';
+    _sseInstance = null;
+    setTimeout(connectSSE, 4000);
+    es.close();
+  };
 
   es.addEventListener('orders_updated', e => {
     S.orders = JSON.parse(e.data);
@@ -735,6 +744,42 @@ async function handleFileUpload(input) {
   }
   document.getElementById('loading').style.display = 'none';
   connectSSE();
+
+  // ── Refresh when app comes back to foreground ──
+  async function refreshAll() {
+    try {
+      await Promise.all([loadAll(), loadStock()]);
+      updateHomePage();
+      const pg = currentPageId();
+      if (pg === 'order-list') renderOrderList();
+      if (pg === 'picking')    renderPicking();
+      if (S.tab === 'reports' && pg !== 'report-detail') renderReportList();
+      if (S.tab === 'stock')   renderStockGroups();
+      if (S.tab === 'admin')   renderAdminList();
+    } catch {}
+    // Reconnect SSE if it dropped
+    if (!_sseInstance || _sseInstance.readyState === EventSource.CLOSED) {
+      connectSSE();
+    }
+  }
+
+  // Page Visibility API — fires when switching away and back
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshAll();
+  });
+
+  // iOS Safari PWA: also fires on resume from background
+  window.addEventListener('pageshow', e => {
+    if (e.persisted) refreshAll();
+  });
+
+  // Fallback: reconnect SSE if it silently died (check every 30s)
+  setInterval(() => {
+    if (!_sseInstance || _sseInstance.readyState === EventSource.CLOSED) {
+      connectSSE();
+    }
+  }, 30000);
+
 })();
 
 // ─── STOCK ───────────────────────────────────────────────
