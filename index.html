@@ -601,19 +601,43 @@ function exportReport(idx) {
   const r = S.reports[idx];
   if (typeof XLSX === 'undefined') { showToast('XLSX 库未加载'); return; }
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-    ['订单号', r.orderId], ['拣货时间', r.finishedAt], [''],
-    ['状态','品项数'],
-    ['正常拣货', r.items.filter(i=>i.status==='done').length],
-    ['缺货',     r.items.filter(i=>i.status==='out').length],
-    ['替代',     r.items.filter(i=>i.status==='sub').length],
-    ['未处理',   r.items.filter(i=>i.status==='pending').length],
-  ]), '汇总');
-  const header = ['Numbering','Description','Qty','UOM','User','状态','替代商品'];
+
   const statusMap = { done:'已拣', out:'缺货', sub:'已替代', pending:'未处理' };
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...r.items.map(i => [i.numbering,i.description,i.qty,i.uom,i.user,statusMap[i.status]||i.status,i.subName||''])]), '明细');
-  const shortages = r.items.filter(i=>i.status==='out');
-  if (shortages.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Numbering','Description','Qty','UOM','User'],...shortages.map(i=>[i.numbering,i.description,i.qty,i.uom,i.user])]), '缺货清单');
+
+  // Sheet 1: 全部商品明细（只含商品、数量、单位）
+  const allHeader = ['Numbering', 'Description', 'Qty', 'UOM', 'User', '状态', '替代商品'];
+  const allRows = r.items.map(i => [
+    i.numbering, i.description, i.qty, i.uom, i.user,
+    statusMap[i.status] || i.status,
+    i.subName || ''
+  ]);
+  const allSheet = XLSX.utils.aoa_to_sheet([allHeader, ...allRows]);
+  // Set column widths
+  allSheet['!cols'] = [
+    {wch:12}, {wch:50}, {wch:8}, {wch:8}, {wch:10}, {wch:8}, {wch:30}
+  ];
+  XLSX.utils.book_append_sheet(wb, allSheet, '全部明细');
+
+  // Sheet 2: 缺货商品
+  const outItems = r.items.filter(i => i.status === 'out');
+  if (outItems.length) {
+    const outHeader = ['Numbering', 'Description', 'Qty', 'UOM', 'User'];
+    const outRows = outItems.map(i => [i.numbering, i.description, i.qty, i.uom, i.user]);
+    const outSheet = XLSX.utils.aoa_to_sheet([outHeader, ...outRows]);
+    outSheet['!cols'] = [{wch:12},{wch:50},{wch:8},{wch:8},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, outSheet, '缺货清单');
+  }
+
+  // Sheet 3: 替代商品
+  const subItems = r.items.filter(i => i.status === 'sub');
+  if (subItems.length) {
+    const subHeader = ['Numbering', 'Description', 'Qty', 'UOM', 'User', '替代商品'];
+    const subRows = subItems.map(i => [i.numbering, i.description, i.qty, i.uom, i.user, i.subName || '']);
+    const subSheet = XLSX.utils.aoa_to_sheet([subHeader, ...subRows]);
+    subSheet['!cols'] = [{wch:12},{wch:50},{wch:8},{wch:8},{wch:10},{wch:30}];
+    XLSX.utils.book_append_sheet(wb, subSheet, '替代商品');
+  }
+
   XLSX.writeFile(wb, `${r.orderId}_拣货报告.xlsx`);
   showToast('✓ 报告已导出');
 }
