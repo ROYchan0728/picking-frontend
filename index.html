@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="拣货系统">
+<meta name="theme-color" content="#1D9E75">
+<title>拣货系统</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root {
+  --green:#1D9E75; --green-dark:#085041; --green-light:#E1F5EE; --green-mid:#9FE1CB;
+  --red:#A32D2D; --red-light:#FCEBEB; --red-border:#F09595;
+  --amber:#BA7517; --amber-light:#FAEEDA; --amber-border:#FAC775;
+  --blue:#185FA5; --blue-light:#E6F1FB; --blue-border:#B5D4F4;
+  --gray:#5F5E5A; --gray-light:#F1EFE8;
+  --success-border:#C0DD97; --success-light:#EAF3DE; --success:#3B6D11;
+  --bg:#F5F5F3; --surface:#FFFFFF;
+  --border:rgba(0,0,0,0.1); --border-md:rgba(0,0,0,0.18);
+  --text:#1a1a18; --text-2:#6b6b67; --text-3:#9a9a96;
+  --radius:10px; --radius-lg:14px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;color:var(--text)}
+body{display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+
+.topbar{background:var(--surface);border-bottom:0.5px solid var(--border);padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-title{font-size:17px;font-weight:600}
+.topbar-sub{font-size:12px;color:var(--text-2);margin-top:1px}
+.back-btn{background:none;border:none;font-size:15px;color:var(--green);cursor:pointer;padding:4px 0;font-weight:500;display:flex;align-items:center;gap:4px}
+
+.tabbar{background:var(--surface);border-top:0.5px solid var(--border);display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;z-index:100;padding-bottom:var(--safe-bottom)}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 6px;cursor:pointer;gap:3px;border:none;background:none}
+.tab-icon{font-size:20px;line-height:1}
+.tab-label{font-size:10px;color:var(--text-3);font-weight:500}
+.tab-item.active .tab-label{color:var(--green)}
+.tab-dot{width:4px;height:4px;border-radius:50%;background:var(--green);margin-top:1px;display:none}
+.tab-item.has-badge .tab-dot{display:block}
+
+.content{flex:1;overflow-y:auto;padding:0 0 calc(70px + var(--safe-bottom))}
+.page{display:none}
+.page.active{display:block}
+
+.section-header{padding:20px 16px 8px;display:flex;align-items:center;justify-content:space-between}
+.section-title{font-size:22px;font-weight:700}
+
+.card{background:var(--surface);border-radius:var(--radius-lg);margin:0 16px 10px;overflow:hidden;border:0.5px solid var(--border)}
+.card-row{padding:13px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;transition:background .1s}
+.card-row:last-child{border-bottom:none}
+.card-row:active{background:var(--bg)}
+.card-plain{padding:14px 16px}
+
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.b-pend{background:var(--gray-light);color:var(--gray)}
+.b-pick{background:var(--amber-light);color:var(--amber)}
+.b-done{background:var(--success-light);color:var(--success)}
+.b-out{background:var(--red-light);color:var(--red)}
+.b-sub{background:var(--blue-light);color:var(--blue)}
+
+.btn{padding:9px 16px;border-radius:var(--radius);border:0.5px solid var(--border-md);background:var(--surface);font-size:14px;cursor:pointer;font-weight:500;color:var(--text);-webkit-appearance:none;transition:opacity .1s}
+.btn:active{opacity:.7}
+.btn-sm{padding:6px 12px;font-size:13px;border-radius:8px}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green-dark)}
+.btn-full{width:100%;text-align:center}
+.btn-success{background:var(--success-light);color:var(--success);border-color:var(--success-border)}
+.btn-warn{background:var(--amber-light);color:var(--amber);border-color:var(--amber-border)}
+.btn-danger{background:var(--red-light);color:var(--red);border-color:var(--red-border)}
+.btn-ghost{background:var(--bg);color:var(--text-2);border-color:var(--border)}
+
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+
+.stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px 16px 4px}
+.stat-card{background:var(--bg);border-radius:var(--radius);padding:10px 12px}
+.stat-label{font-size:11px;color:var(--text-2);margin-bottom:4px}
+.stat-value{font-size:22px;font-weight:700}
+
+.pick-list{padding:0 16px}
+.pick-item{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:13px 14px;margin-bottom:9px;transition:all .2s}
+.pick-item.is-done{background:var(--success-light);border-color:var(--success-border)}
+.pick-item.is-out{background:var(--red-light);border-color:var(--red-border)}
+.pick-item.is-sub{background:var(--blue-light);border-color:var(--blue-border)}
+.pick-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+.pick-num{font-size:11px;font-weight:600;color:var(--green);margin-bottom:3px}
+.pick-desc{font-size:14px;font-weight:500;line-height:1.35}
+.pick-meta{font-size:11px;color:var(--text-2);margin-top:4px}
+.pick-right{text-align:right;flex-shrink:0}
+.pick-qty{font-size:18px;font-weight:700}
+.pick-uom{font-size:11px;color:var(--text-2)}
+.pick-actions{display:flex;gap:7px;flex-wrap:wrap}
+.sub-input-row{display:flex;gap:7px;margin-top:8px}
+.sub-input-row input{flex:1;padding:8px 11px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);-webkit-appearance:none}
+.sub-input-row input:focus{outline:none;box-shadow:0 0 0 2px var(--green-mid);border-color:var(--green)}
+.sub-note{font-size:12px;color:var(--blue);margin-top:6px}
+
+.report-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background .1s}
+.report-row:last-child{border-bottom:none}
+.report-row:active{background:var(--bg)}
+.report-row-left{flex:1;min-width:0}
+.report-row-id{font-size:15px;font-weight:600}
+.report-row-date{font-size:12px;color:var(--text-2);margin-top:2px}
+.report-pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.report-match-hint{font-size:12px;color:var(--text-2);margin-top:5px}
+.chevron{color:var(--text-3);font-size:17px;flex-shrink:0}
+
+.r-section-title{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin:18px 16px 8px}
+.r-item-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:0.5px solid var(--border)}
+.r-item-row:last-child{border-bottom:none}
+.r-item-row.hl-row{background:#FFFBEB}
+.r-item-num{font-size:11px;font-weight:600;color:var(--green);margin-bottom:2px}
+.r-item-desc{font-size:13px;line-height:1.35}
+.r-item-sub{font-size:12px;color:var(--blue);margin-top:3px}
+.r-item-right{text-align:right;flex-shrink:0}
+.r-item-qty{font-size:14px;font-weight:600}
+.r-item-user{font-size:11px;color:var(--text-2);margin-top:2px}
+
+.search-wrap{position:relative;margin:10px 16px 6px}
+.search-wrap input{width:100%;padding:10px 36px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:15px;background:var(--surface);color:var(--text);-webkit-appearance:none}
+.search-wrap input:focus{outline:none;box-shadow:0 0 0 2px var(--green-mid);border-color:var(--green)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text-3);pointer-events:none}
+.search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--text-3);color:#fff;border:none;width:18px;height:18px;border-radius:50%;font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center}
+.search-meta{font-size:12px;color:var(--text-2);padding:2px 16px 8px}
+.highlight{background:#FEF08A;color:#713f12;border-radius:2px;padding:0 1px}
+
+.upload-zone{border:1.5px dashed var(--border-md);border-radius:var(--radius-lg);padding:24px 16px;text-align:center;cursor:pointer;margin:0 16px 16px;background:var(--surface)}
+.upload-zone:active{border-color:var(--green);background:var(--green-light)}
+.upload-zone-icon{font-size:28px;color:var(--text-3);margin-bottom:8px}
+.upload-zone-text{font-size:14px;color:var(--text-2);font-weight:500}
+.upload-zone-sub{font-size:12px;color:var(--text-3);margin-top:4px}
+input[type="file"]{display:none}
+
+.empty-state{text-align:center;padding:48px 24px;color:var(--text-2)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-text{font-size:15px;font-weight:500}
+.empty-sub{font-size:13px;color:var(--text-3);margin-top:6px}
+
+.finish-area{padding:12px 16px 0}
+
+/* sync indicator */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
+.sync-dot.live{background:var(--green)}
+.sync-dot.error{background:var(--red)}
+
+.toast{position:fixed;bottom:calc(80px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(30,30,30,0.92);color:#fff;padding:10px 20px;border-radius:24px;font-size:14px;font-weight:500;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:999}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Loading overlay */
+.loading{position:fixed;inset:0;background:rgba(255,255,255,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px;font-size:14px;color:var(--text-2)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <span>连接服务器...</span>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar" id="topbar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="back-btn" id="backBtn" style="display:none" onclick="handleBack()">‹ 返回</button>
+    <div>
+      <div class="topbar-title" id="topbarTitle">拣货系统</div>
+      <div id="topbarSub" style="font-size:12px;color:var(--text-2);margin-top:1px;display:none"></div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="sync-dot" id="syncDot" title="实时连接状态"></span>
+    <div id="topbarRight"></div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <div class="page active" id="page-orders">
+    <div class="section-header">
+      <span class="section-title">待拣订单</span>
+      <span class="badge b-pend" id="orderCountBadge"></span>
+    </div>
+    <div id="orderListContent"></div>
+  </div>
+
+  <div class="page" id="page-picking">
+    <div class="stats-grid" id="pickStats"></div>
+    <div class="pick-list" id="pickItems"></div>
+    <div class="finish-area">
+      <button class="btn btn-primary btn-full" onclick="finishPicking()">完成拣货，生成报告</button>
+    </div>
+  </div>
+
+  <div class="page" id="page-reports">
+    <div class="section-header"><span class="section-title">拣货报告</span></div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="reportSearch" placeholder="搜索订单号或品项..." oninput="onSearch(this)">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+    </div>
+    <div class="search-meta" id="searchMeta"></div>
+    <div class="card" id="reportListCard"></div>
+  </div>
+
+  <div class="page" id="page-report-detail">
+    <div class="stats-grid" id="detailStats"></div>
+    <div id="detailContent"></div>
+  </div>
+
+
+  <div class="page" id="page-stock">
+    <div id="stock-group-view">
+      <div class="section-header"><span class="section-title">库存</span></div>
+      <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品组别</div>
+      <div class="card" id="stockGroupList"></div>
+    </div>
+    <div id="stock-category-view" style="display:none">
+      <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品类别</div>
+      <div class="card" id="stockCategoryList"></div>
+    </div>
+    <div id="stock-items-view" style="display:none">
+      <div class="search-wrap" style="margin-top:10px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="stockSearch" placeholder="搜索商品名称或代码..." oninput="onStockSearch(this)">
+        <button class="search-clear" id="stockSearchClear" onclick="clearStockSearch()">✕</button>
+      </div>
+      <div class="search-meta" id="stockSearchMeta"></div>
+      <div class="card" id="stockItemsList"></div>
+    </div>
+  </div>
+  <div class="page" id="page-admin">
+    <div class="section-header"><span class="section-title">后台管理</span></div>
+    <p style="font-size:13px;color:var(--text-2);padding:0 16px 12px">上传 Excel 文件，文件名自动成为订单号</p>
+    <label for="fileInput">
+      <div class="upload-zone">
+        <div class="upload-zone-icon">📂</div>
+        <div class="upload-zone-text">点击上传订单 Excel</div>
+        <div class="upload-zone-sub">.xlsx 格式 · 含 Numbering, Description, Qty, User UOM 列</div>
+      </div>
+    </label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileUpload(this)">
+    <div style="padding:4px 16px 8px;font-size:13px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">已载入订单</div>
+    <div class="card" id="adminOrderList"></div>
+  </div>
+
+</div>
+
+<!-- TAB BAR -->
+<div class="tabbar">
+  <button class="tab-item active" id="tab-orders" onclick="switchMainTab('orders')">
+    <span class="tab-icon">📦</span>
+    <span class="tab-label">订单</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-reports" onclick="switchMainTab('reports')">
+    <span class="tab-icon">📋</span>
+    <span class="tab-label">报告</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-stock" onclick="switchMainTab('stock')">
+    <span class="tab-icon">🗄️</span>
+    <span class="tab-label">库存</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-admin" onclick="switchMainTab('admin')">
+    <span class="tab-icon">⚙️</span>
+    <span class="tab-label">管理</span>
+    <span class="tab-dot"></span>
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────
+// API address comes from config.js (edit that file with your Railway URL)
+const API = window.BACKEND_URL || '';
+
+// ─── STATE ───────────────────────────────────────────────
+const S = {
+  tab: 'orders',
+  pageStack: [],
+  currentOrder: null,
+  currentReport: null,
+  searchQuery: '',
+  orders: [],
+  reports: []
+};
+
+// ─── API CALLS ───────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function loadAll() {
+  const [orders, reports] = await Promise.all([
+    apiFetch('/api/orders'),
+    apiFetch('/api/reports')
+  ]);
+  S.orders  = orders;
+  S.reports = reports;
+}
+
+// ─── SSE REAL-TIME ───────────────────────────────────────
+function connectSSE() {
+  const es = new EventSource(API + '/api/events');
+  const dot = document.getElementById('syncDot');
+
+  es.onopen = () => dot.className = 'sync-dot live';
+  es.onerror = () => { dot.className = 'sync-dot error'; setTimeout(connectSSE, 4000); es.close(); };
+
+  es.addEventListener('orders_updated', e => {
+    S.orders = JSON.parse(e.data);
+    if (S.tab === 'orders') renderOrderList();
+    if (S.tab === 'admin')  renderAdminList();
+    if (currentPageId() === 'picking') renderPicking();
+  });
+
+  es.addEventListener('item_updated', e => {
+    const { orderId, item } = JSON.parse(e.data);
+    const order = S.orders.find(o => o.id === orderId);
+    if (!order) return;
+    const idx = order.items.findIndex(i => i.id === item.id);
+    if (idx >= 0) order.items[idx] = item;
+    if (currentPageId() === 'picking' && S.currentOrder === orderId) renderPicking();
+    if (S.tab === 'orders') renderOrderList();
+  });
+
+  es.addEventListener('report_created', e => {
+    S.reports.unshift(JSON.parse(e.data));
+    if (S.tab === 'reports') renderReportList();
+  });
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────
+function currentPageId() {
+  const a = document.querySelector('.page.active');
+  return a ? a.id.replace('page-', '') : 'orders';
+}
+function showPage(id, title, sub) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('topbarTitle').textContent = title || '拣货系统';
+  const subEl = document.getElementById('topbarSub');
+  if (sub) { subEl.textContent = sub; subEl.style.display = 'block'; }
+  else subEl.style.display = 'none';
+  document.getElementById('topbarRight').innerHTML = '';
+}
+function pushPage(id, title, sub) {
+  S.pageStack.push({ id: currentPageId(), title: document.getElementById('topbarTitle').textContent, sub: document.getElementById('topbarSub').textContent });
+  showPage(id, title, sub);
+  document.getElementById('backBtn').style.display = 'flex';
+  window.scrollTo(0, 0);
+}
+function handleBack() {
+  if (!S.pageStack.length) return;
+  const prev = S.pageStack.pop();
+  showPage(prev.id, prev.title, prev.sub || null);
+  if (!S.pageStack.length) document.getElementById('backBtn').style.display = 'none';
+  if (prev.id === 'orders')  renderOrderList();
+  if (prev.id === 'reports') renderReportList();
+  if (prev.id === 'stock') { renderStockGroups(); document.getElementById('stock-group-view').style.display='block'; document.getElementById('stock-category-view').style.display='none'; document.getElementById('stock-items-view').style.display='none'; }
+  window.scrollTo(0, 0);
+}
+function switchMainTab(tab) {
+  S.tab = tab; S.pageStack = [];
+  document.getElementById('backBtn').style.display = 'none';
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'orders')  { showPage('orders',  '待拣订单'); renderOrderList(); }
+  if (tab === 'reports') { showPage('reports', '拣货报告'); renderReportList(); }
+  if (tab === 'admin')   { showPage('admin',   '后台管理'); renderAdminList(); }
+  if (tab === 'stock')   { showPage('stock',   '库存'); renderStockGroups(); }
+  window.scrollTo(0, 0);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────
+function progress(order) {
+  const done = order.items.filter(i => i.status !== 'pending').length;
+  return { done, total: order.items.length };
+}
+function orderStatus(order) {
+  const p = progress(order);
+  return p.done === 0 ? 'pending' : p.done < p.total ? 'picking' : 'done';
+}
+function hl(text, q) {
+  if (!q) return text;
+  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(text).replace(new RegExp('(' + esc + ')', 'gi'), '<span class="highlight">$1</span>');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── ORDER LIST ───────────────────────────────────────────
+function renderOrderList() {
+  const pending = S.orders.filter(o => orderStatus(o) !== 'done').length;
+  document.getElementById('orderCountBadge').textContent = pending + ' 待处理';
+  document.getElementById('tab-orders').classList.toggle('has-badge', pending > 0);
+  const labels = { pending:'待拣货', picking:'拣货中', done:'已完成' };
+  const bc     = { pending:'b-pend', picking:'b-pick', done:'b-done' };
+  const html = S.orders.map(o => {
+    const p = progress(o), st = orderStatus(o), pct = Math.round(p.done / p.total * 100);
+    return `<div class="card-row" onclick="openOrder('${o.id}')">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+          <span style="font-size:16px;font-weight:600">${o.id}</span>
+          <span class="badge ${bc[st]}">${labels[st]}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-2)">${p.total} 个品项 · ${o.loadedAt}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:4px">${p.done} / ${p.total} 已处理</div>
+      </div>
+      <span style="color:var(--text-3);font-size:18px;margin-left:8px">›</span>
+    </div>`;
+  }).join('');
+  document.getElementById('orderListContent').innerHTML = `<div class="card">${html ||
+    '<div class="card-plain"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无订单</div><div class="empty-sub">请在管理页上传 Excel</div></div></div>'}</div>`;
+}
+
+// ─── PICKING ──────────────────────────────────────────────
+function openOrder(id) {
+  S.currentOrder = id;
+  const order = S.orders.find(o => o.id === id);
+  pushPage('picking', order.id, order.filename);
+  renderPicking();
+}
+function renderPicking() {
+  const order = S.orders.find(o => o.id === S.currentOrder);
+  if (!order) return;
+  const p = progress(order);
+  const out = order.items.filter(i => i.status === 'out').length;
+  const sub = order.items.filter(i => i.status === 'sub').length;
+  document.getElementById('pickStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value" style="color:var(--green)">${p.done}</div></div>
+    <div class="stat-card"><div class="stat-label">缺货</div><div class="stat-value" style="color:var(--red)">${out}</div></div>
+    <div class="stat-card"><div class="stat-label">替代</div><div class="stat-value" style="color:var(--blue)">${sub}</div></div>`;
+  document.getElementById('pickItems').innerHTML = order.items.map(item => renderPickItem(item)).join('');
+}
+function renderPickItem(item) {
+  let cls='', badge='<span class="badge b-pend">待拣</span>', body='';
+  if (item.status==='done')         { cls='is-done'; badge='<span class="badge b-done">已拣</span>';    body=`<div class="pick-actions"><button class="btn btn-sm btn-ghost" onclick="patchItem(${item.id},'pending')">撤销</button></div>`; }
+  else if (item.status==='out')     { cls='is-out';  badge='<span class="badge b-out">缺货</span>';     body=`<div class="pick-actions"><button class="btn btn-sm btn-ghost" onclick="patchItem(${item.id},'pending')">撤销</button></div>`; }
+  else if (item.status==='sub')     { cls='is-sub';  badge='<span class="badge b-sub">已替代</span>';   body=`<div class="sub-note">替代：${item.subName}</div><div class="pick-actions" style="margin-top:8px"><button class="btn btn-sm btn-ghost" onclick="patchItem(${item.id},'pending')">撤销</button></div>`; }
+  else if (item.status==='entering-sub') { cls='is-sub'; badge='<span class="badge b-sub">输入替代</span>'; body=`<div class="sub-input-row"><input id="si-${item.id}" type="text" placeholder="输入替代商品名称..." onkeydown="if(event.key==='Enter')confirmSub(${item.id})"><button class="btn btn-sm btn-primary" onclick="confirmSub(${item.id})">确认</button><button class="btn btn-sm btn-ghost" onclick="patchItem(${item.id},'pending')">取消</button></div>`; }
+  else { body=`<div class="pick-actions"><button class="btn btn-sm btn-success" onclick="patchItem(${item.id},'done')">已拣</button><button class="btn btn-sm btn-warn" onclick="startSub(${item.id})">替代</button><button class="btn btn-sm btn-danger" onclick="patchItem(${item.id},'out')">缺货</button></div>`; }
+  return `<div class="pick-item ${cls}" id="pi-${item.id}"><div class="pick-top"><div style="flex:1;min-width:0"><div class="pick-num">${item.numbering}</div><div class="pick-desc">${item.description}</div><div class="pick-meta">User: ${item.user}</div></div><div class="pick-right">${badge}<div class="pick-qty">${item.qty}</div><div class="pick-uom">${item.uom}</div></div></div>${body}</div>`;
+}
+
+async function patchItem(itemId, status, subName) {
+  const body = { status };
+  if (subName) body.subName = subName;
+  try {
+    await apiFetch(`/api/orders/${S.currentOrder}/items/${itemId}`, {
+      method: 'PATCH', body: JSON.stringify(body)
+    });
+    // SSE will update the UI — but also update local state immediately for responsiveness
+    const order = S.orders.find(o => o.id === S.currentOrder);
+    const item = order.items.find(i => i.id === itemId);
+    item.status = status;
+    if (subName) item.subName = subName; else delete item.subName;
+    renderPicking();
+  } catch (e) { showToast('保存失败，请重试'); }
+}
+
+function startSub(itemId) {
+  const order = S.orders.find(o => o.id === S.currentOrder);
+  const item = order.items.find(i => i.id === itemId);
+  item.status = 'entering-sub';
+  renderPicking();
+  setTimeout(() => { const el = document.getElementById('si-' + itemId); if (el) el.focus(); }, 60);
+}
+function confirmSub(itemId) {
+  const inp = document.getElementById('si-' + itemId);
+  const val = inp ? inp.value.trim() : '';
+  if (!val) { if (inp) inp.focus(); return; }
+  patchItem(itemId, 'sub', val);
+}
+
+async function finishPicking() {
+  const order = S.orders.find(o => o.id === S.currentOrder);
+  const pending = order.items.filter(i => i.status === 'pending').length;
+  if (pending > 0 && !confirm(`还有 ${pending} 个品项未处理，确认完成拣货？`)) return;
+  try {
+    const { report } = await apiFetch('/api/reports', { method: 'POST', body: JSON.stringify({ orderId: S.currentOrder }) });
+    S.reports.unshift(report);
+    showToast('✓ 报告已生成');
+    switchMainTab('reports');
+  } catch (e) { showToast('生成报告失败，请重试'); }
+}
+
+// ─── REPORT LIST ─────────────────────────────────────────
+function onSearch(input) {
+  S.searchQuery = input.value.trim();
+  document.getElementById('searchClear').style.display = S.searchQuery ? 'flex' : 'none';
+  renderReportList();
+}
+function clearSearch() {
+  S.searchQuery = ''; document.getElementById('reportSearch').value = '';
+  document.getElementById('searchClear').style.display = 'none';
+  renderReportList();
+}
+function renderReportList() {
+  const q = S.searchQuery.toLowerCase();
+  const meta = document.getElementById('searchMeta');
+  const card = document.getElementById('reportListCard');
+  if (!S.reports.length) {
+    meta.textContent = '';
+    card.innerHTML = '<div class="card-plain"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无报告</div><div class="empty-sub">完成拣货后自动生成</div></div></div>';
+    return;
+  }
+  const filtered = S.reports.filter(r => {
+    if (!q) return true;
+    if (r.orderId.toLowerCase().includes(q)) return true;
+    return r.items.some(i => i.description.toLowerCase().includes(q) || i.numbering.toLowerCase().includes(q) || i.user.toLowerCase().includes(q) || (i.subName && i.subName.toLowerCase().includes(q)));
+  });
+  meta.textContent = q ? `找到 ${filtered.length} 笔 · 搜索"${S.searchQuery}"` : `共 ${S.reports.length} 笔报告`;
+  if (!filtered.length) { card.innerHTML = '<div class="card-plain" style="text-align:center;padding:24px;color:var(--text-2);font-size:14px">没有符合的报告</div>'; return; }
+  card.innerHTML = filtered.map(r => {
+    const realIdx = S.reports.indexOf(r);
+    const done=r.items.filter(i=>i.status==='done').length, out=r.items.filter(i=>i.status==='out').length, sub=r.items.filter(i=>i.status==='sub').length, pend=r.items.filter(i=>i.status==='pending').length;
+    const pills = [done?`<span class="badge b-done">已拣 ${done}</span>`:'', out?`<span class="badge b-out">缺货 ${out}</span>`:'', sub?`<span class="badge b-sub">替代 ${sub}</span>`:'', pend?`<span class="badge b-pend">未处理 ${pend}</span>`:''].filter(Boolean).join('');
+    const matchedItems = q ? r.items.filter(i => i.description.toLowerCase().includes(q) || i.numbering.toLowerCase().includes(q) || (i.subName && i.subName.toLowerCase().includes(q))) : [];
+    const hint = matchedItems.length ? `<div class="report-match-hint">匹配：${matchedItems.slice(0,2).map(i=>`<b>${i.numbering}</b> ${i.description.substring(0,18)}…`).join('，')}${matchedItems.length>2?` 等${matchedItems.length}项`:''}</div>` : '';
+    return `<div class="report-row" onclick="openReportDetail(${realIdx})"><div class="report-row-left"><div class="report-row-id">${hl(r.orderId,S.searchQuery)}</div><div class="report-row-date">${r.finishedAt}</div><div class="report-pills">${pills}</div>${hint}</div><span class="chevron">›</span></div>`;
+  }).join('');
+}
+
+function openReportDetail(idx) {
+  S.currentReport = idx;
+  const r = S.reports[idx];
+  pushPage('report-detail', r.orderId, r.finishedAt);
+  document.getElementById('topbarRight').innerHTML = `<button class="btn btn-sm btn-primary" onclick="exportReport(${idx})">导出</button>`;
+  const q = S.searchQuery;
+  const done=r.items.filter(i=>i.status==='done'), out=r.items.filter(i=>i.status==='out'), sub=r.items.filter(i=>i.status==='sub'), pend=r.items.filter(i=>i.status==='pending');
+  document.getElementById('detailStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">已拣</div><div class="stat-value" style="color:var(--green)">${done.length}</div></div>
+    <div class="stat-card"><div class="stat-label">缺货</div><div class="stat-value" style="color:var(--red)">${out.length}</div></div>
+    <div class="stat-card"><div class="stat-label">替代</div><div class="stat-value" style="color:var(--blue)">${sub.length}</div></div>`;
+  const mkSection = (title, items, extraFn) => {
+    if (!items.length) return '';
+    const rows = items.map(item => {
+      const isMatch = q && (item.description.toLowerCase().includes(q.toLowerCase()) || item.numbering.toLowerCase().includes(q.toLowerCase()) || (item.subName && item.subName.toLowerCase().includes(q.toLowerCase())));
+      return `<div class="r-item-row ${isMatch?'hl-row':''}"><div style="flex:1;min-width:0"><div class="r-item-num">${hl(item.numbering,q)}</div><div class="r-item-desc">${hl(item.description,q)}</div>${extraFn?extraFn(item):''}</div><div class="r-item-right"><div class="r-item-qty">${item.qty} ${item.uom}</div><div class="r-item-user">${hl(item.user,q)}</div></div></div>`;
+    }).join('');
+    return `<div class="r-section-title">${title}</div><div class="card" style="margin-bottom:4px">${rows}</div>`;
+  };
+  document.getElementById('detailContent').innerHTML =
+    mkSection('缺货品项', out,  i=>`<span class="badge b-out" style="margin-top:4px;display:inline-flex">缺货</span>`) +
+    mkSection('替代品项', sub,  i=>`<div class="r-item-sub">→ ${hl(i.subName,q)}</div>`) +
+    mkSection('正常完成', done, null) +
+    mkSection('未处理',   pend, i=>`<span class="badge b-pend" style="margin-top:4px;display:inline-flex">未处理</span>`);
+}
+
+// ─── EXPORT ──────────────────────────────────────────────
+function exportReport(idx) {
+  const r = S.reports[idx];
+  if (typeof XLSX === 'undefined') { showToast('XLSX 库未加载'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['订单号', r.orderId], ['拣货时间', r.finishedAt], [''],
+    ['状态','品项数'],
+    ['正常拣货', r.items.filter(i=>i.status==='done').length],
+    ['缺货',     r.items.filter(i=>i.status==='out').length],
+    ['替代',     r.items.filter(i=>i.status==='sub').length],
+    ['未处理',   r.items.filter(i=>i.status==='pending').length],
+  ]), '汇总');
+  const header = ['Numbering','Description','Qty','UOM','User','状态','替代商品'];
+  const statusMap = { done:'已拣', out:'缺货', sub:'已替代', pending:'未处理' };
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...r.items.map(i => [i.numbering,i.description,i.qty,i.uom,i.user,statusMap[i.status]||i.status,i.subName||''])]), '明细');
+  const shortages = r.items.filter(i=>i.status==='out');
+  if (shortages.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Numbering','Description','Qty','UOM','User'],...shortages.map(i=>[i.numbering,i.description,i.qty,i.uom,i.user])]), '缺货清单');
+  XLSX.writeFile(wb, `${r.orderId}_拣货报告.xlsx`);
+  showToast('✓ 报告已导出');
+}
+
+// ─── ADMIN ────────────────────────────────────────────────
+function renderAdminList() {
+  const bc={pending:'b-pend',picking:'b-pick',done:'b-done'}, lb={pending:'待拣货',picking:'拣货中',done:'已完成'};
+  const html = S.orders.map(o => {
+    const st=orderStatus(o);
+    return `<div class="card-row" style="cursor:default">
+      <div style="flex:1"><div style="font-size:15px;font-weight:600">${o.id}</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">${o.filename} · ${o.items.length} 品项</div></div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="badge ${bc[st]}">${lb[st]}</span><button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">删除</button></div>
+    </div>`;
+  }).join('');
+  document.getElementById('adminOrderList').innerHTML = html || '<div class="card-plain" style="text-align:center;padding:20px;color:var(--text-2);font-size:13px">暂无订单</div>';
+}
+
+async function deleteOrder(id) {
+  if (!confirm(`确认删除订单 ${id}？`)) return;
+  try {
+    await apiFetch(`/api/orders/${id}`, { method: 'DELETE' });
+    S.orders = S.orders.filter(o => o.id !== id);
+    renderAdminList();
+    showToast('✓ 已删除');
+  } catch { showToast('删除失败'); }
+}
+
+async function handleFileUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const { order } = await fetch(API + '/api/orders/upload', { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
+    const idx = S.orders.findIndex(o => o.id === order.id);
+    if (idx >= 0) S.orders[idx] = order; else S.orders.unshift(order);
+    renderAdminList();
+    showToast(`✓ 已导入 ${order.id}（${order.items.length} 品项）`);
+  } catch { showToast('上传失败，请检查文件格式'); }
+  input.value = '';
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+(async () => {
+  try {
+    await loadAll();
+    renderOrderList();
+  } catch (e) {
+    document.getElementById('loading').innerHTML = '<div style="text-align:center;padding:32px;color:#A32D2D"><div style="font-size:32px;margin-bottom:12px">⚠️</div><div style="font-size:15px;font-weight:500">无法连接服务器</div><div style="font-size:13px;color:#6b6b67;margin-top:6px">请检查网络或联系管理员</div></div>';
+    return;
+  }
+  document.getElementById('loading').style.display = 'none';
+  connectSSE();
+})();
+
+// ─── STOCK DATA ───────────────────────────────────────────
+const STOCK_ITEMS = [{"code": "000001", "uom": "VOL", "name": "电气设备记录本/ELECTRICAL EQUIPMENT LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 142.0}, {"code": "000002", "uom": "VOL", "name": "IMPA手册第八版/IMPA 8 EDITION", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "000003", "uom": "VOL", "name": "船舶保安日志/SHIP SECURITY LOGBOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 26.0}, {"code": "000004", "uom": "VOL", "name": "访客日志/VISTIOR LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 25.0}, {"code": "000005", "uom": "VOL", "name": "海生物记录本/BIOFOULING RECORD BOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 65.0}, {"code": "000006", "uom": "VOL", "name": "燃油硫含量记录本/ MARINE FUEL SULPHUR RECORD BOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 46.0}, {"code": "000007", "uom": "VOL", "name": "生活污水排放记录表/ SEWAGE DISCHARGING LOGBOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 41.0}, {"code": "000008", "uom": "PCS", "name": "不锈钢卡箍 6MM-12MM/ STAINLESS STEEL SS304 HOSE BAND 6MM-12MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 120.0}, {"code": "000009", "uom": "PCS", "name": "不锈钢卡箍 19MM-29MM/ STAINLESS STEEL SS304 HOSE BAND 19MM-29MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 260.0}, {"code": "000010", "uom": "PCS", "name": "不锈钢卡箍 46MM-70MM/ STAINLESS STEEL SS304 HOSE BAND 46MM-70MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 2090.0}, {"code": "000011", "uom": "PCS", "name": "不锈钢卡箍 105MM-127MM/ STAINLESS STEEL SS304 HOSE BAND 105MM-127MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 230.0}, {"code": "000012", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径4MM 开口8MM / SS D SHACKLE SCREW PIN DIA 4MM OPEN 8MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 80.0}, {"code": "000013", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径6MM 开口11MM / SS D SHACKLE SCREW PIN DIA 6MM OPEN 11MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 236.0}, {"code": "000014", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径10MM 开口20MM / SS D SHACKLE SCREW PIN DIA 10MM OPEN 20MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 592.0}, {"code": "000015", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径14MM 开口28MM / SS D SHACKLE SCREW PIN DIA 14MM OPEN 28MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "000016", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径20MM 开口40MM / SS D SHACKLE SCREW PIN DIA 20MM OPEN 40MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 496.0}, {"code": "000017", "uom": "PCS", "name": "凸面尺 7.5M/ CONVEX RULER 7.5M", "group": "五金与通用器材", "category": "卷尺", "qty": 156.0}, {"code": "000018", "uom": "PCS", "name": "凸面尺 10M/ CONVEX RULER 10M", "group": "五金与通用器材", "category": "卷尺", "qty": 4.0}, {"code": "000019", "uom": "PCS", "name": "缆绳防磨垫/ ROPE CHAFING PAD", "group": "缆绳", "category": "缆绳附件", "qty": 466.0}, {"code": "000020", "uom": "PCS", "name": "不锈钢卡头24MM/ STAINLESS STEEL SS304 WIRE CLIP 24MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "000021", "uom": "PCS", "name": "不锈钢卡头 28MM/ STAINLESS STEEL SS304 WIRE CLIP 28MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 268.0}, {"code": "000022", "uom": "PCS", "name": "不锈钢卡头 32MM/ STAINLESS STEEL SS304 WIRE CLIP 32MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 416.0}, {"code": "000023", "uom": "PCS", "name": "G402 美式旋转环 12.5T/ G402 AMERICAN TYPE SWIVEL EYE 12.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "000024", "uom": "PCS", "name": "G402 美式旋转环 25T/ G402 AMERICAN TYPE SWIVEL EYE 25T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 14.0}, {"code": "150001", "uom": "PCS", "name": "抹布 350×450/ CLEANING RAG 350×450", "group": "床上用品与纺织", "category": "清洁布料", "qty": 800.0}, {"code": "150002", "uom": "PCS", "name": "刷碗布 400×700/ DISHWASHING CLOTH 400×700", "group": "床上用品与纺织", "category": "清洁布料", "qty": 800.0}, {"code": "150107", "uom": "PCS", "name": "床单棉（白）1500×2500/ BED SHEET (WHITE) 1500×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 240.0}, {"code": "150117", "uom": "PCS", "name": "床单棉（白）1800×2500/ BED SHEET (WHITE) 1800×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 220.0}, {"code": "150127", "uom": "PCS", "name": "床单棉（白）2200×2500/ BED SHEET (WHITE) 2200×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 317.0}, {"code": "150146", "uom": "PCS", "name": "床单棉（蓝）1500×2500/ BED SHEET (BLUE) 1500×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 261.0}, {"code": "150157", "uom": "PCS", "name": "床单棉（蓝）1800×2500/ BED SHEET (BLUE) 1800×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 400.0}, {"code": "150163", "uom": "PCS", "name": "床单棉（蓝）2200×2500/ BED SHEET (BLUE) 2200×2500", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 400.0}, {"code": "150281", "uom": "PCS", "name": "枕芯 （乳胶）600×400/ PILLOW (LATEX FOAM) 600×400", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 291.0}, {"code": "150283", "uom": "PCS", "name": "枕芯（羽毛）690×460/ PILLOW (FEATHER) 690×460", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 213.0}, {"code": "150286", "uom": "PCS", "name": "枕头套（白色）750×500×200 / PILLOW CASE (WHITE) 750×500×200", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 50.0}, {"code": "150287", "uom": "PCS", "name": "枕头套 （蓝色） 750×500×200/ PILLOW CASE (BLUE) 750×500×200", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 66.0}, {"code": "150288", "uom": "PCS", "name": "被套 （蓝色） 1800×2400/ DUVET COVER (BLUE) 1800×2400", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 192.0}, {"code": "150288（1）", "uom": "PCS", "name": "被套（白色） 1800×2400/ DUVET COVER (WHITE) 1800×2400", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 85.0}, {"code": "150289", "uom": "PCS", "name": "被套（蓝色） 1500×2400/ DUVET COVER BLUE 1500×2400", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 107.0}, {"code": "150289(1)", "uom": "PCS", "name": "被套（白色） 1500*2400/ DUVET COVER (WHITE) 1500×2400", "group": "床上用品与纺织", "category": "床单被套枕具", "qty": 60.0}, {"code": "150346", "uom": "PCS", "name": "羊毛毯（驼色） 1500×2000/ WOOL BLANKET (CAMEL) 1500×2000", "group": "床上用品与纺织", "category": "毯子", "qty": 179.0}, {"code": "150351", "uom": "PCS", "name": "羊毛毯（驼色） 1800*2300/ WOOL BLANKET (CAMEL) 1800×2300", "group": "床上用品与纺织", "category": "毯子", "qty": 285.0}, {"code": "150461", "uom": "PCS", "name": "厨师防水围裙 / CHEF WATERPROOF APRON", "group": "个人防护与劳保", "category": "防护服装", "qty": 84.0}, {"code": "150601", "uom": "PCS", "name": "浴巾 （白色）600G 700×1400 / BATH TOWEL 600G 700×1400", "group": "床上用品与纺织", "category": "毛巾浴巾", "qty": 454.0}, {"code": "150602", "uom": "PCS", "name": "浴巾（蓝色）700×1330 400G / BATH TOWEL (BLUE) 700×1330 400G", "group": "床上用品与纺织", "category": "毛巾浴巾", "qty": 1073.0}, {"code": "150606", "uom": "PCS", "name": "棉毛巾（白色）350*750  120G TOWELS/ COTTON TOWEL (WHITE) 350×750 120G", "group": "床上用品与纺织", "category": "毛巾浴巾", "qty": 143.0}, {"code": "150607", "uom": "PCS", "name": "棉毛巾（蓝色）350×750 120G / COTTON TOWEL (BLUE) 350×750 120G", "group": "床上用品与纺织", "category": "毛巾浴巾", "qty": 735.0}, {"code": "174280", "uom": "PCS", "name": "拖把拧水桶 14L（黑色） / WRINGER MOP BUCKET 14L (BLACK)", "group": "个人防护与劳保", "category": "清洁工具", "qty": 5.0}, {"code": "175121", "uom": "SET", "name": "440V商用电磁炉灶台15kw_50hz（带锅和水龙头）/ COMMERCIAL INDUCTION COOKER RANGE, 440V, 15KW, 50hz", "group": "工具与设备", "category": "其他类别", "qty": 12.0}, {"code": "190102", "uom": "PRS", "name": "橡胶耐磨棉手套 / RUBBER COATED COTTON GLOVES", "group": "个人防护与劳保", "category": "防护手套", "qty": 24844.0}, {"code": "190111", "uom": "PRS", "name": "皮手套/ LEATHER PALM WORKING GLOVES", "group": "个人防护与劳保", "category": "防护手套", "qty": 4020.0}, {"code": "190122", "uom": "pair", "name": "GLOVES RUBBE 洗碗手套", "group": "个人防护与劳保", "category": "清洁工具", "qty": 950.0}, {"code": "190131", "uom": "PRS", "name": "塑料耐油防酸手套（短）/ PLASTIC OIL AND ACID RESISTANT GLOVES (SHORT)", "group": "个人防护与劳保", "category": "防护手套", "qty": 5.0}, {"code": "190132", "uom": "PRS", "name": "塑料耐油防酸手套（长）/ PLASTIC OIL AND ACID RESISTANT GLOVES (LONG)", "group": "个人防护与劳保", "category": "防护手套", "qty": 1632.0}, {"code": "190211", "uom": "PRS", "name": "长雨靴 25CM 40码 / LONG RAIN BOOTS 25CM SIZE 40", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 77.0}, {"code": "190212", "uom": "PRS", "name": "长雨靴 26CM 41码 / LONG RAIN BOOTS 26CM SIZE 41", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 58.0}, {"code": "190213", "uom": "PRS", "name": "长雨靴 27CM 42码 / LONG RAIN BOOTS 27CM SIZE 42", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 53.0}, {"code": "190214", "uom": "PRS", "name": "长雨靴 28CM 43码 / LONG RAIN BOOTS 28CM SIZE 43", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 54.0}, {"code": "190215", "uom": "PRS", "name": "长雨靴 29CM 44码 / LONG RAIN BOOTS 29CM SIZE 44", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 73.0}, {"code": "190216", "uom": "PRS", "name": "长雨靴 30CM 45码 / LONG RAIN BOOTS 30CM SIZE 45", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 30.0}, {"code": "190403", "uom": "SET", "name": "夜光分体雨衣170CM/ RAIN SUITS 170CM", "group": "个人防护与劳保", "category": "防护服装", "qty": 629.0}, {"code": "190421/22", "uom": "SET", "name": "长雨衣暗扣均码/ RAIN COATS", "group": "个人防护与劳保", "category": "防护服装", "qty": 719.0}, {"code": "190471", "uom": "PCS", "name": "遮阳帽/ STRAW HAT", "group": "个人防护与劳保", "category": "安全防护配件", "qty": 294.0}, {"code": "190541", "uom": "SHEET", "name": "连体式工作服（白）M（160CM-165CM） / Working Coverall (White) M (160–165CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 155.0}, {"code": "190542", "uom": "SHEET", "name": "连体式工作服（白）L（170CM） / Working Coverall (White) L (170CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 160.0}, {"code": "190543", "uom": "SHEET", "name": "连体式工作服（白）XL（175CM） / Working Coverall (White) XL (175CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 116.0}, {"code": "190544", "uom": "SHEET", "name": "连体式工作服（白）XXL（180CM） / Working Coverall (White) XXL (180CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 134.0}, {"code": "190545", "uom": "SHEET", "name": "连体式工作服（白）XXXL（185CM） / Working Coverall (White) XXXL (185CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 138.0}, {"code": "190545-1", "uom": "SHEET", "name": "连体式工作服（白）XXXXL（190CM） / Working Coverall (White) XXXXL (190CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 60.0}, {"code": "190546", "uom": "SHEET", "name": "连体式工作服（蓝）M（160CM-165CM） / Working Coverall (Blue) M (160–165CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 167.0}, {"code": "190547", "uom": "SHEET", "name": "连体式工作服（蓝）L（170CM） / Working Coverall (Blue) L (170CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 185.0}, {"code": "190548", "uom": "SHEET", "name": "连体式工作服（蓝）XL（175CM） / Working Coverall (Blue) XL (175CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 205.0}, {"code": "190549", "uom": "SHEET", "name": "连体式工作服（蓝）XXL（180CM） / Working Coverall (Blue) XXL (180CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 186.0}, {"code": "190550", "uom": "SHEET", "name": "连体式工作服（蓝）XXXL（185CM） / Working Coverall (Blue) XXXL (185CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 194.0}, {"code": "190550-1", "uom": "SHEET", "name": "连体式工作服（蓝）XXXXL（190CM） / Working Coverall (Blue) XXXXL (190CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 63.0}, {"code": "190556", "uom": "SHEET", "name": "连体式工作服（橙）M（160CM-165CM） / Working Coverall (Orange) M (160–165CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 155.0}, {"code": "190557", "uom": "SHEET", "name": "连体式工作服（橙）L（170CM） / Working Coverall (Orange) L (170CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 107.0}, {"code": "190558", "uom": "SHEET", "name": "连体式工作服（橙）XL（175CM） / Working Coverall (Orange) XL (175CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 103.0}, {"code": "190559", "uom": "SHEET", "name": "连体式工作服（橙）XXL（180CM） / Working Coverall (Orange) XXL (180CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 169.0}, {"code": "190560", "uom": "SHEET", "name": "连体式工作服（橙）XXXL（185CM） / Working Coverall (Orange) XXXL (185CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 63.0}, {"code": "190560-1", "uom": "SHEET", "name": "连体式工作服（橙）XXXXL（190CM） / Working Coverall (Orange) XXXXL (190CM)", "group": "个人防护与劳保", "category": "防护服装", "qty": 37.0}, {"code": "190611", "uom": "SHEET", "name": "防寒上衣 连帽 带反光条 (M)/ PARKAS WITH REFLECTIVE TAPE  (M)", "group": "个人防护与劳保", "category": "防护服装", "qty": 0}, {"code": "190612", "uom": "SHEET", "name": "防寒上衣 连帽 带反光条(L)/  PARKAS WITH REFLECTIVE TAPE  (L)", "group": "个人防护与劳保", "category": "防护服装", "qty": 159.0}, {"code": "190613", "uom": "SHEET", "name": "防寒上衣 连帽 带反光条 (XL)/  PARKAS WITH REFLECTIVE TAPE  (XL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 180.0}, {"code": "190614", "uom": "SHEET", "name": "防寒上衣 连帽 带反光条 (2XL)/  PARKAS WITH REFLECTIVE TAPE  (2XL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 59.0}, {"code": "190615", "uom": "SHEET", "name": "防寒上衣 连帽 带反光条 (XXXL)/  PARKAS WITH REFLECTIVE TAPE  (XXXL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 38.0}, {"code": "190616", "uom": "SHEET", "name": "藏青色 防寒裤 带反光条 (M)/  \nWINTER TROUSERS  WITH REFLECTIVE TAPE  (M)", "group": "个人防护与劳保", "category": "防护服装", "qty": 0}, {"code": "190617", "uom": "SHEET", "name": "藏青色 防寒裤 带反光条 (L)/  \nWINTER TROUSERS  WITH REFLECTIVE TAPE  (L)", "group": "个人防护与劳保", "category": "防护服装", "qty": 170.0}, {"code": "190618", "uom": "SHEET", "name": "藏青色 防寒裤 带反光条 (XL)/  \nWINTER TROUSERS  WITH REFLECTIVE TAPE  (XL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 220.0}, {"code": "190619", "uom": "SHEET", "name": "藏青色 防寒裤 带反光条 (2XL)/ \nWINTER TROUSERS  WITH REFLECTIVE TAPE  (2XL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 100.0}, {"code": "190620", "uom": "SHEET", "name": "藏青色 防寒裤 带反光条 (XXXL)/ \nWINTER TROUSERS  WITH REFLECTIVE TAPE  (XXXL)", "group": "个人防护与劳保", "category": "防护服装", "qty": 47.0}, {"code": "191283", "uom": "PAIR", "name": "双钢雨靴40码/ BOOTS RUBBER CLOTH-LINING LONG SIZE 40", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 58.0}, {"code": "191284", "uom": "PAIR", "name": "双钢雨靴41码/ BOOTS RUBBER CLOTH-LINING LONG SIZE 41", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 67.0}, {"code": "191285", "uom": "PAIR", "name": "双钢雨靴42码/ BOOTS RUBBER CLOTH-LINING LONG SIZE 42", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 44.0}, {"code": "191286", "uom": "PAIR", "name": "双钢雨靴43码/BOOTS RUBBER CLOTH-LINING LONG SIZE 43", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 38.0}, {"code": "191287", "uom": "PAIR", "name": "双钢雨靴44码/ BOOTS RUBBER CLOTH-LINING LONG SIZE 44", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 59.0}, {"code": "191288", "uom": "PAIR", "name": "双钢雨靴45码/ BOOTS RUBBER CLOTH-LINING LONG SIZE 45", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 15.0}, {"code": "191684", "uom": "PAIR", "name": "绝缘工作鞋41码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 41", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 127.0}, {"code": "191685", "uom": "PAIR", "name": "绝缘工作鞋42码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 42", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 123.0}, {"code": "191686", "uom": "PAIR", "name": "绝缘工作鞋43码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 43", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 76.0}, {"code": "191687", "uom": "PAIR", "name": "绝缘工作鞋44码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 44", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 81.0}, {"code": "191688", "uom": "PAIR", "name": "绝缘工作鞋45码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 45", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 58.0}, {"code": "191689", "uom": "PAIR", "name": "绝缘工作鞋46码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 46", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 63.0}, {"code": "191983", "uom": "PAIR", "name": "绝缘工作鞋40码/ ELECTRICAL INSULATED SAFETY SHOES SIZE 40", "group": "个人防护与劳保", "category": "安全鞋靴", "qty": 99.0}, {"code": "211152", "uom": "PCS", "name": "系泊卸扣 120T/TONSBERG MOORING LINK 120T", "group": "缆绳", "category": "系泊连接件", "qty": 40.0}, {"code": "211153", "uom": "PCS", "name": "系泊卸扣 180T/ TONSBERG MOORING LINK 180T", "group": "缆绳", "category": "系泊连接件", "qty": 48.0}, {"code": "211157", "uom": "PCS", "name": "导索卸扣 120T/ MANDAL FAIRLEAD SHACKLE", "group": "缆绳", "category": "系泊连接件", "qty": 46.0}, {"code": "230003", "uom": "PCS", "name": "撇揽头/ HAVING LINE WEIGHT", "group": "缆绳", "category": "缆绳附件", "qty": 1040.0}, {"code": "231107", "uom": "MTR", "name": "电镀锌链条 尺寸：19mm × 76 × 150M / Zinc Plated Chain Size:19mm × 76 × 150M", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "231122", "uom": "MTR", "name": "白钢链条 2MM/ CHAIN SS304 2MM", "group": "五金与通用器材", "category": "不锈钢链条", "qty": 1000.0}, {"code": "231123", "uom": "MTR", "name": "白钢链条 4MM/ CHAIN SS304 4MM", "group": "五金与通用器材", "category": "不锈钢链条", "qty": 3000.0}, {"code": "231124", "uom": "MTR", "name": "白钢链条 5MM/ CHAIN SS304 5MM", "group": "五金与通用器材", "category": "不锈钢链条", "qty": 3000.0}, {"code": "231125", "uom": "MTR", "name": "白钢链条 6MM/ CHAIN SS304 6MM", "group": "五金与通用器材", "category": "不锈钢链条", "qty": 2970.0}, {"code": "232481", "uom": "PCS", "name": "不锈钢排水孔栓 800G 45MM/ 800G STAINLESS STEEL SCUPPER PLUG 45MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 150.0}, {"code": "232482", "uom": "PCS", "name": "不锈钢排水孔栓 800G 52MM/ 800G STAINLESS STEEL SCUPPER PLUG 52MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 184.0}, {"code": "232483", "uom": "PCS", "name": "不锈钢排水孔栓 800G 65MM/ 800G STAINLESS STEEL SCUPPER PLUG 65MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 129.0}, {"code": "232484", "uom": "PCS", "name": "不锈钢排水孔栓 800G 85MM/ 800G STAINLESS STEEL SCUPPER PLUG 85MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 120.0}, {"code": "232485", "uom": "PCS", "name": "不锈钢排水孔栓 800G 90MM/ 800G STAINLESS STEEL SCUPPER PLUGS 90MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 66.0}, {"code": "232486", "uom": "PCS", "name": "不锈钢排水孔栓 800G 110MM/ 800G STAINLESS STEEL SCUPPER PLUG 110MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 88.0}, {"code": "232487", "uom": "PCS", "name": "不锈钢排水孔栓 800G 135MM/ 800G STAINLESS STEEL SCUPPER PLUGS 135MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 106.0}, {"code": "232488", "uom": "PCS", "name": "不锈钢排水孔栓 800G 165MM/ 800G STAINLESS STEEL SCUPPER PLUGS 165MM", "group": "五金与通用器材", "category": "排水孔栓", "qty": 108.0}, {"code": "232601", "uom": "PCS", "name": "镀锌油漏斗100MM/ GALVANIZED OIL FUNNELS 100MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 136.0}, {"code": "232602", "uom": "PCS", "name": "镀锌油漏斗125MM/ GALVANIZED OIL FUNNELS 125MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 154.0}, {"code": "232603", "uom": "PCS", "name": "镀锌油漏斗150MM/ GALVANIZED OIL FUNNELS 150MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 142.0}, {"code": "232604", "uom": "PCS", "name": "镀锌油漏斗200MM/ GALVANIZED OIL FUNNELS 200MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 138.0}, {"code": "232605", "uom": "PCS", "name": "镀锌油漏斗225MM/ GALVANIZED OIL FUNNELS 225MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 6.0}, {"code": "232606", "uom": "PCS", "name": "镀锌油漏斗250MM/ GALVANIZED OIL FUNNELS 250MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 85.0}, {"code": "232607", "uom": "PCS", "name": "镀锌油漏斗300MM/ GALVANIZED OIL FUNNELS 300MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 98.0}, {"code": "232608", "uom": "PCS", "name": "镀锌油漏斗350MM/ GALVANIZED OIL FUNNELS 350MM", "group": "五金与通用器材", "category": "油漏斗", "qty": 5.0}, {"code": "233501", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径7MM 开口14MM / SS D SHACKLE SCREW PIN DIA 7MM OPEN 14MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "233502", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径8MM 开口17MM / SS D SHACKLE SCREW PIN DIA 8MM OPEN 17MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 159.0}, {"code": "233503", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径9MM 开口18MM / SS D SHACKLE SCREW PIN DIA 9MM OPEN 18MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "233504", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径12MM 开口24MM / SS D SHACKLE SCREW PIN DIA 12MM OPEN 24MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 238.0}, {"code": "233506", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径16MM 开口32MM / SS D SHACKLE SCREW PIN DIA 16MM OPEN 32MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 298.0}, {"code": "233507", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径18MM 开口36MM / SS D SHACKLE SCREW PIN DIA 18MM OPEN 36MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 13.0}, {"code": "233508", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径22MM 开口44MM / SS D SHACKLE SCREW PIN DIA 22MM OPEN 44MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "233509", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径25MM 开口50MM / SS D SHACKLE SCREW PIN DIA 25MM OPEN 50MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 219.0}, {"code": "233510", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径28MM 开口56MM / SS D SHACKLE SCREW PIN DIA 28MM OPEN 56MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 294.0}, {"code": "233511", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径32MM 开口64MM / SS D SHACKLE SCREW PIN DIA 32MM OPEN 64MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 55.0}, {"code": "233512", "uom": "PCS", "name": "不锈钢D型卸扣 螺丝销 直径38MM 开口76MM / SS D SHACKLE SCREW PIN DIA 38MM OPEN 76MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 30.0}, {"code": "233651", "uom": "PCS", "name": "不锈钢卡头1.5MM/ STAINLESS STEEL SS304 WIRE CLIP 1.5MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "233652", "uom": "PCS", "name": "不锈钢卡头2MM/ STAINLESS STEEL SS304 WIRE CLIP 2MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 148.0}, {"code": "233653", "uom": "PCS", "name": "不锈钢卡头3MM/ STAINLESS STEEL SS304 WIRE CLIP 3MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "233654", "uom": "PCS", "name": "不锈钢卡头4MM/ STAINLESS STEEL SS304 WIRE CLIP 4MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 384.0}, {"code": "233655", "uom": "PCS", "name": "不锈钢卡头5MM/ STAINLESS STEEL SS304 WIRE CLIP 5MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 651.0}, {"code": "233656", "uom": "PCS", "name": "不锈钢卡头6MM/ STAINLESS STEEL SS304 WIRE CLIP 6MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1262.0}, {"code": "233657", "uom": "PCS", "name": "不锈钢卡头8MM/ STAINLESS STEEL SS304 WIRE CLIP 8MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1132.0}, {"code": "233658", "uom": "PCS", "name": "不锈钢卡头10MM/ STAINLESS STEEL SS304 WIRE CLIP 10MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 968.0}, {"code": "233659", "uom": "PCS", "name": "不锈钢卡头12MM/ STAINLESS STEEL SS304 WIRE CLIP 12MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1003.0}, {"code": "233660", "uom": "PCS", "name": "不锈钢卡头14MM/ STAINLESS STEEL SS304 WIRE CLIP 14MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1035.0}, {"code": "233661", "uom": "PCS", "name": "不锈钢卡头16MM/ STAINLESS STEEL SS304 WIRE CLIP 16MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 956.0}, {"code": "233662", "uom": "PCS", "name": "不锈钢卡头18MM/ STAINLESS STEEL SS304 WIRE CLIP 18MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1090.0}, {"code": "233663", "uom": "PCS", "name": "不锈钢卡头20-22MM/ STAINLESS STEEL SS304 WIRE CLIP 20-22MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1154.0}, {"code": "234102", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1/4\" 载荷: 0.5吨 / H.D.G Shackle G210 Size:1/4\" WLL: 0.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234107", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1/2\" 载荷: 2吨 / H.D.G Shackle G210 Size:1/2\" WLL: 2T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234108", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：5/8\" 载荷: 3.25吨 / H.D.G Shackle G210 Size:5/8\" WLL: 3.25T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234109", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：3/4\" 载荷: 4.75吨 / H.D.G Shackle G210 Size:3/4\" WLL: 4.75T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234110", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：7/8\" 载荷: 6.5吨 / H.D.G Shackle G210 Size:7/8\" WLL: 6.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234111", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1\" 载荷: 8.5吨 / H.D.G Shackle G210 Size:1\" WLL: 8.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234112", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1-1/8\" 载荷: 9.5吨 / H.D.G Shackle G210 Size:1-1/8\" WLL: 9.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234113", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1-1/4\" 载荷: 12吨 / H.D.G Shackle G210 Size:1-1/4\" WLL: 12T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234114", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1-3/8\" 载荷: 13.5吨 / H.D.G Shackle G210 Size:1-3/8\" WLL: 13.5T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234115", "uom": "PCS", "name": "热镀锌卸扣 G210 尺寸：1-1/2\" 载荷: 17吨 / H.D.G Shackle G210 Size:1-1/2\" WLL: 17T", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234231", "uom": "PCS", "name": "六角螺栓型弓形卸扣 2 TON/ BOW SHACKLE HEX HEAD BOLIT GALV 2 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "234232", "uom": "PCS", "name": "六角螺栓型弓形卸扣 3.25 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  3.25 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 42.0}, {"code": "234233", "uom": "PCS", "name": "六角螺栓型弓形卸扣 4.75 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  4.75 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "234234", "uom": "PCS", "name": "六角螺栓型弓形卸扣 6.5 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  6.5 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "234235", "uom": "PCS", "name": "六角螺栓型弓形卸扣 8.5 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  8.5 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "234236", "uom": "PCS", "name": "六角螺栓型弓形卸扣 9.5 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  9.5 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 227.0}, {"code": "234237", "uom": "PCS", "name": "六角螺栓型弓形卸扣 12 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  12 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 156.0}, {"code": "234238", "uom": "PCS", "name": "六角螺栓型弓形卸扣 13.5 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  13.5 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 45.0}, {"code": "234239", "uom": "PCS", "name": "六角螺栓型弓形卸扣 17 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  17 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 60.0}, {"code": "234240", "uom": "PCS", "name": "六角螺栓型弓形卸扣 25 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  25 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 40.0}, {"code": "234241", "uom": "PCS", "name": "六角螺栓型弓形卸扣 35 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  35 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234242", "uom": "PCS", "name": "六角螺栓型弓形卸扣 55 TON/ BOW SHACKLE HEX HEAD BOLIT GALV  55 TON", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234404", "uom": "PCS", "name": "通用吊环/ MASTER LINK", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0}, {"code": "234434", "uom": "PCS", "name": "蝴蝶扣16MM/ LOCK CONNECTING FORGED ALLOY/STEEL CROSBY 16MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 865.0}, {"code": "270107", "uom": "SET", "name": "喷涂机 附带13米喷涂管 CE无气喷涂机 34:1 6L/MIN / CE Airless Paint Sprayer 34:1 6L/Min (With 13m Spray Hose)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 9.0}, {"code": "270122", "uom": "SSET", "name": "真空喷枪_英制螺纹PF1/4\n_250KG/24.8MPA/ Airless Paint Spray Hand Gun PF1/4 Thread 250KG/24.8MPA", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 23.0}, {"code": "270126", "uom": "PCS", "name": "真空长杆喷枪900MM/ \nAIRLESS PAINT SPRAY POLE GUN 900MM", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 21.0}, {"code": "270127", "uom": "SET", "name": "真空长杆喷枪1800MM/ \nAIRLESS PAINT SPRAY POLE GUN 1800MM", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 6.0}, {"code": "270128", "uom": "SET", "name": "真空长杆喷枪2400MM/ \nAIRLESS PAINT SPRAY POLE GUN 2400MM", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 10.0}, {"code": "270138", "uom": "PCS", "name": "喷枪_喷嘴_517_黄色/ AIRLESS PAINT SPRAY NOZZLE 517 (YELLOW)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 465.0}, {"code": "27013801", "uom": "PCS", "name": "喷枪_喷嘴座(铜芯)_红色款/ AIRLESS PAINT SPRAY NOZZLE SEAT (RED)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 275.0}, {"code": "270161", "uom": "ROLL", "name": "喷漆管 (英制螺纹_PF1/4) 6MM X10MTR/ PAINT SPRAY HOSE PF1/4 THREAD 6MM×10M", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 17.0}, {"code": "270162", "uom": "ROLL", "name": "喷漆管 (英制螺纹_PF1/4) 6MM X 15MTR/PAINT SPRAY HOSE PF1/4 THREAD 6MM×15M", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "270163", "uom": "ROLL", "name": "喷漆管 (英制螺纹_PF1/4) 6MMX20MTR/PAINT SPRAY HOSE PF1/4 THREAD 6MM×20M", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 12.0}, {"code": "270164", "uom": "PCS", "name": "喷漆管 (英制螺纹_PF1/4) 6MM X 30MTR/ PAINT SPRAY HOSE PF1/4 THREAD 6MM×30M", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 14.0}, {"code": "310301", "uom": "PC", "name": "安全帽 (白）/ SAFETY HELMET(WHITE)", "group": "个人防护与劳保", "category": "安全帽", "qty": 611.0}, {"code": "310302", "uom": "PC", "name": "安全帽 (蓝）/ SAFETY HELMET(BLUE)", "group": "个人防护与劳保", "category": "安全帽", "qty": 430.0}, {"code": "310303", "uom": "PC", "name": "安全帽 (红）/ SAFETY HELMET(RED)", "group": "个人防护与劳保", "category": "安全帽", "qty": 261.0}, {"code": "310304", "uom": "PC", "name": "安全帽 (黄）/ SAFETY HELMET(YELLOW)", "group": "个人防护与劳保", "category": "安全帽", "qty": 420.0}, {"code": "311031", "uom": "pc", "name": "UV激光护目镜/ UV-RESISTANT GOGGLES", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 245.0}, {"code": "311051", "uom": "PCS", "name": "SAFETY GOGGLES (CLEAR)", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 2.0}, {"code": "311052", "uom": "pc", "name": "灰色护目镜/ PROTECTIVE EYEWEAR (GRAY)", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 2790.0}, {"code": "311054", "uom": "PC", "name": "黑色护目镜/ PROTECTIVE EYEWEAR (BLACK)", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 1262.0}, {"code": "311101", "uom": "PCS", "name": "医用护目镜/ CHEMICAL RESISTANT GOGGLE SPLASH", "group": "个人防护与劳保", "category": "防疫用品", "qty": 1980.0}, {"code": "311141", "uom": "pc", "name": "防雾防尘护目镜/ SAFETY GOGGLES ANTI-FOG DUSTPROOF (CLEAR)", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 1555.0}, {"code": "314116", "uom": "PCS", "name": "假人/ DUMMY ANTI-PIRACY BARE", "group": "个人防护与劳保", "category": "安全防护配件", "qty": 27.0}, {"code": "330341", "uom": "PC", "name": "手动充气式救生衣/ LIFEJACKET INFLATABLE MANUAL", "group": "个人防护与劳保", "category": "安全防护配件", "qty": 142.0}, {"code": "330611", "uom": "PCS", "name": "手提式防爆手电/ RECHARGEABLE EXPLOSION PROOF HAND LAMP", "group": "个人防护与劳保", "category": "防爆照明", "qty": 24.0}, {"code": "330618", "uom": "PCS", "name": "LED充电防爆头灯/ EXPLOSION PROOF LED HEAD LAMP", "group": "个人防护与劳保", "category": "防爆照明", "qty": 95.0}, {"code": "33099X", "uom": "PCS", "name": "医用防护服/ CHEMICAL PROTECTION SUITS", "group": "个人防护与劳保", "category": "防疫用品", "qty": 2000.0}, {"code": "331101", "uom": "PCS", "name": "安全带及安全钩/ SAFETY BELTS & HOOKS (EUROPE)", "group": "个人防护与劳保", "category": "安全防护配件", "qty": 121.0}, {"code": "331141", "uom": "pcs", "name": "护目镜/ PROTECTIVE EYEWEAR (CLEAR)", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 5136.0}, {"code": "331144", "uom": "PCS", "name": "医用防护面罩/ FACESHIELD WITH FOREHEAD PROTECTION", "group": "个人防护与劳保", "category": "防疫用品", "qty": 1980.0}, {"code": "331157", "uom": "PRS", "name": "耳塞/ EAR PLUG", "group": "个人防护与劳保", "category": "安全防护配件", "qty": 4210.0}, {"code": "331177", "uom": "PCS", "name": "N95口罩/ DUST MASK DISPOSABLE N95", "group": "个人防护与劳保", "category": "防疫用品", "qty": 11900.0}, {"code": "332615", "uom": "VOL", "name": "SOLAS 防火训练手册/ SOLAS FIRE TRAINING MANUAL", "group": "记录簿", "category": "SOLAS训练手册", "qty": 50.0}, {"code": "332631", "uom": "VOL", "name": "SOLAS 训练手册/ SOLAS TRAINING MANUAL", "group": "记录簿", "category": "SOLAS训练手册", "qty": 46.0}, {"code": "332641", "uom": "VOL", "name": "利比里亚 压载水记录簿 / LIBERIA BALLAST WATER RECORD BOOK", "group": "记录簿", "category": "其他类别", "qty": 40.0}, {"code": "332643", "uom": "VOL", "name": "利比里亚 消耗臭氧物质记录簿 / LIBERIA OZONE DEPLETING SUBSTANCES RECORD BOOK", "group": "记录簿", "category": "其他类别", "qty": 50.0}, {"code": "332644", "uom": "VOL", "name": "利比里亚 船员服务协议（雇佣协议）/ LIBERIA SHIPPING ARTICLES / ARTICLES OF AGREEMENT", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "351051", "uom": "PCS", "name": "铸铜空气管接头6MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 6MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351052", "uom": "PCS", "name": "铸铜空气管接头8MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 8MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351053", "uom": "PCS", "name": "铸铜空气管接头9MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 9MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 0.0}, {"code": "351054", "uom": "PCS", "name": "铸铜空气管接头12MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 12MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351055", "uom": "PCS", "name": "铸铜空气管接头15MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 15MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351056", "uom": "PCS", "name": "铸铜空气管接头19MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 19MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351057", "uom": "PCS", "name": "铸铜空气管接头25MM  M42X2/ CAST BRONZE AIR HOSE COUPLINGS 25MM  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "351058", "uom": "PCS", "name": "空气软管接头防尘盖（铜制）M42×2/ CAP FOR CAST BRONZE AIR HOSE COUPLINGS  M42X2", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "370853", "uom": "VOL", "name": "油类记录本 II 部（油轮）/ OIL RECORD BOOK (P2)", "group": "记录簿", "category": "油类记录本", "qty": 337.0}, {"code": "370853 （1）", "uom": "VOL", "name": "马绍尔群岛油类记录簿/ OIL RECORD BOOK  (MARSHALL ISLANDS EDITION)", "group": "记录簿", "category": "油类记录本", "qty": 46.0}, {"code": "370853_3", "uom": "VOL", "name": "利比里亚 油类记录簿 第I部分 / LIBERIA OIL RECORD BOOK PART I", "group": "记录簿", "category": "其他类别", "qty": 50.0}, {"code": "370853_4", "uom": "VOL", "name": "利比里亚 油类记录簿 第II部分 / LIBERIA OIL RECORD BOOK PART II", "group": "记录簿", "category": "其他类别", "qty": 50.0}, {"code": "370854", "uom": "VOL", "name": "车钟记录本/ BELL LOGBOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 107.0}, {"code": "370857", "uom": "VOL", "name": "轮机日志/ ENGINE LOGBOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 217.0}, {"code": "370861", "uom": "VOL", "name": "油类记录本 I 部(通用 所有船）/OIL RECORD BOOK (P1)", "group": "记录簿", "category": "油类记录本", "qty": 572.0}, {"code": "370867", "uom": "VOL", "name": "雷达记录本/ RADAR LOGBOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 111.0}, {"code": "370868", "uom": "VOL", "name": "无线电日志/ GMDSS RADIO LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 105.0}, {"code": "370868_1", "uom": "VOL", "name": "利比里亚 GMDSS无线电日志簿 / LIBERIA OFFICIAL GMDSS RADIO LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "370869", "uom": "VOL", "name": "VHF 记录本/ VHF RECORD BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 36.0}, {"code": "370871", "uom": "VOL", "name": "利比里亚官方记录本/ OFFICIAL LOG BOOK (LIBERIA)", "group": "记录簿", "category": "行政与合规记录本", "qty": 191.0}, {"code": "370871 （1）", "uom": "VOL", "name": "香港官方记录本/ OFFICIAL LOGBOOK (HONG KONG)", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "370876", "uom": "VOL", "name": "天文钟记录簿/ CHRONOMETER DEVIATION RECORD BOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 33.0}, {"code": "370881", "uom": "VOL", "name": "夜航命令本/ NIGHT ORDER BOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 136.0}, {"code": "370881 (1)", "uom": "VOL", "name": "轮机长夜航命令本/ CHIEF ENGINEER NIGHT ORDER BOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 176.0}, {"code": "370883", "uom": "VOL", "name": "罗经差记录本/ COMPASS ERROR LOGBOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 137.0}, {"code": "370887", "uom": "VOL", "name": "巴拿马油类记录本/  PANAMA OIL RECORD BOOK", "group": "记录簿", "category": "油类记录本", "qty": 12.0}, {"code": "370888", "uom": "VOL", "name": "巴拿马官方记录本/ PANAMA OFFICIAL LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 15.0}, {"code": "370889", "uom": "VOL", "name": "巴拿马船员记录本/ PANAMA VESSEL CREW LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 21.0}, {"code": "370896", "uom": "VOL", "name": "副机日志/ GENERATOR ENIGNE LOGBOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 90.0}, {"code": "370902", "uom": "VOL", "name": "马绍尔货物记录簿/ MARSHALL ISLANDS CARGO RECORD BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 45.0}, {"code": "370902_1", "uom": "VOL", "name": "利比里亚 货物记录簿 / LIBERIA CARGO RECORD BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "371581", "uom": "PCS", "name": "旗钩（上下成套）/ FLAG HOOK UPPER&LOWER COMPLETE", "group": "五金与通用器材", "category": "旗杆配件", "qty": 240.0}, {"code": "371586", "uom": "PCS", "name": "黄铜旗索滑轮32MM/ BLOCK FLAG BRASS 32MM", "group": "五金与通用器材", "category": "旗杆配件", "qty": 505.0}, {"code": "371587", "uom": "PCS", "name": "黄铜旗索滑轮38MM/ BLOCK FLAG BRASS 38MM", "group": "五金与通用器材", "category": "旗杆配件", "qty": 505.0}, {"code": "371588", "uom": "PCS", "name": "黄铜旗索滑轮50MM/ BLOCK FLAG BRASS 50MM", "group": "五金与通用器材", "category": "旗杆配件", "qty": 605.0}, {"code": "371846", "uom": "VOL", "name": "垃圾记录本（通用）/ GARBAGE RECORD BOOK (ALL PART)", "group": "记录簿", "category": "环保合规记录本", "qty": 0}, {"code": "371846 (1)", "uom": "VOL", "name": "垃圾记录本 I 部分/ GARBAGE RECORD BOOK (P1)", "group": "记录簿", "category": "环保合规记录本", "qty": 86.0}, {"code": "371846 (2)", "uom": "VOL", "name": "垃圾记录本 II 部分/ GARBAGE RECORD BOOK(P2)", "group": "记录簿", "category": "环保合规记录本", "qty": 161.0}, {"code": "371846_3", "uom": "VOL", "name": "利比里亚 垃圾记录簿 第I部分 / LIBERIA GARBAGE RECORD BOOK PART I", "group": "记录簿", "category": "环保合规记录本", "qty": 50.0}, {"code": "371846_4", "uom": "VOL", "name": "利比里亚 垃圾记录簿 第II部分 / LIBERIA GARBAGE RECORD BOOK PART II", "group": "记录簿", "category": "环保合规记录本", "qty": 50.0}, {"code": "371847", "uom": "VOL", "name": "压载水记录本/ BALLAST WATER RECORD BOOK", "group": "记录簿", "category": "环保合规记录本", "qty": 113.0}, {"code": "372633", "uom": "VOL", "name": "SOLAS救生消防检查清单/ SOLAS CHECKLIST SAVING & FIRE FIGHTING EQUIPMENT", "group": "记录簿", "category": "SOLAS训练手册", "qty": 38.0}, {"code": "378051", "uom": "VOL", "name": "航海日志/ DECK LOGBOOK", "group": "记录簿", "category": "航行与机舱日志", "qty": 136.0}, {"code": "391805", "uom": "PCS", "name": "普通医用口罩/ DISPOSABLE FACE MASK", "group": "个人防护与劳保", "category": "防疫用品", "qty": 49800.0}, {"code": "391871", "uom": "VOL", "name": "医疗记录簿/ MEDICAL LOG BOOK", "group": "记录簿", "category": "其他类别", "qty": 50.0}, {"code": "391871_1", "uom": "VOL", "name": "利比里亚 船舶医疗记录簿 / LIBERIA MEDICAL LOG BOOK", "group": "记录簿", "category": "行政与合规记录本", "qty": 50.0}, {"code": "391874", "uom": "PCS", "name": "医用英科丁腈手套/ NITRILE MEDICAL GLOVES", "group": "个人防护与劳保", "category": "防疫用品", "qty": 4900.0}, {"code": "3-S-10MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 10MM × 200M/ 3-STRAND NYLON DIA 10MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-12MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 12MM X 200M/ 3-STRAND NYLON DIA 12MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-14MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 14MM X 200M/ 3-STRAND NYLON DIA 14MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-16MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 16MM X 200M/ 3-STRAND NYLON DIA 16MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "3-S-18MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 18MM X 220M/ 3-STRAND NYLON DIA 18MM X 220M", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "3-S-20MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 20MM X 200M/ 3-STRAND NYLON DIA 20MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 25.0}, {"code": "3-S-22MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 22MM X 200M/ 3-STRAND NYLON DIA 22MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 15.0}, {"code": "3-S-24MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 24MM X 200M/ 3-STRAND NYLON DIA 24MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 13.0}, {"code": "3-S-26MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 26MM X 200M/ 3-STRAND NYLON DIA 26MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-28MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 28MM X 200M/ 3-STRAND NYLON DIA 28MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-30MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 30MM X 200M/ 3-STRAND NYLON DIA 30MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "3-S-32MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 32MM X 200M/ 3-STRAND NYLON DIA 32MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "3-S-36MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 36MM X 200M/ 3-STRAND NYLON DIA 36MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "3-S-6MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 6MM X 200M/ 3-STRAND NYLON DIA 6MM X 200M", "group": "缆绳", "category": "缆绳本体", "qty": 5.0}, {"code": "3-S-8MM", "uom": "COIL", "name": "三股尼龙缆绳 直径 8 MM X 200 M/  3-STRAND NYLON DIA 8 MM X 200 M", "group": "缆绳", "category": "缆绳本体", "qty": 0}, {"code": "471013", "uom": "PCS", "name": "割刀美工刀18MM/ HANDY CUTTER 18MM", "group": "五金与通用器材", "category": "美工刀", "qty": 0.0}, {"code": "510308", "uom": "SET", "name": "滚筒刷 200MM（含手柄跟滚筒）/ COMPLETE WITH HANDIE SPARE PAINT ROLLER 200MM", "group": "五金与通用器材", "category": "滚筒刷", "qty": 505.0}, {"code": "510338", "uom": "PCS", "name": "滚筒刷头200MM/ SPARE PAINT ROLLER 200MM", "group": "五金与通用器材", "category": "滚筒刷", "qty": 6174.0}, {"code": "510461", "uom": "SET", "name": "滚筒刷 100MM（含手柄跟滚筒）/ COMPLETE WITH HANDIE SPARE PAINT ROLLER 100MM", "group": "五金与通用器材", "category": "滚筒刷", "qty": 1743.0}, {"code": "510462", "uom": "PCS", "name": "滚筒刷头100MM/ SPARE PAINT ROLLER 100MM", "group": "五金与通用器材", "category": "滚筒刷", "qty": 54556.0}, {"code": "550660", "uom": "PCS", "name": "喷壶2L/ HAND SPRAYER 2L", "group": "个人防护与劳保", "category": "防疫用品", "qty": 200.0}, {"code": "55066X", "uom": "PCS", "name": "挂肩喷雾器16L/ SPRAYER SHOULDER TYPE 16 LTR", "group": "个人防护与劳保", "category": "防疫用品", "qty": 60.0}, {"code": "590101", "uom": "SET", "name": "气动冲击扳手SP-1W13 0.5英寸/ PNEUMATIC IMPACT WRENCH SP-1W13 0.5 INCH", "group": "工具与设备", "category": "气动工具", "qty": 6.0}, {"code": "590105", "uom": "SET", "name": "气动充气扳手SP-1W19 3/4英寸/ PNEUMATIC IMPACT WRENCH SP-1W19 3/4 INCH", "group": "工具与设备", "category": "气动工具", "qty": 2.0}, {"code": "590106", "uom": "SET", "name": "气动冲击扳手SP-1W25 1英寸/ PNEUMATIC IMPACT WRENCH SP-1W25 1 INCH", "group": "工具与设备", "category": "气动工具", "qty": 9.0}, {"code": "590108", "uom": "SET", "name": "气动冲击扳手SP-1W37 1.5英寸/ PNEUMATIC IMPACT WRENCH SP-1W37 1.5 INCH", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "590301", "uom": "SET", "name": "气动角磨机SP-AG100 /PNEUMATIC ANGLE GRINDERS SP-AG100", "group": "工具与设备", "category": "气动工具", "qty": 101.0}, {"code": "590302", "uom": "SET", "name": "气动角磨机 SP-AG180/ PNEUMATIC ANGLE GRINDERS SP-AG180", "group": "工具与设备", "category": "气动工具", "qty": 40.0}, {"code": "590382", "uom": "SET", "name": "气动敲锈锤 SP-S2/ PNEUMATIC SCALING HAMMERS SP-S2", "group": "工具与设备", "category": "气动工具", "qty": 4.0}, {"code": "590383", "uom": "SET", "name": "三头敲锈锤 MS-3NV/ PNEUMATIC SCALING  HAMMERS  MS-3NV", "group": "工具与设备", "category": "气动工具", "qty": 27.0}, {"code": "590387", "uom": "PCS", "name": "单头敲锈锤锤头_30MM(适用于SC-2)/ SPARE HAMMER HEAD  FOR SC-2 30MM", "group": "工具与设备", "category": "气动工具", "qty": 115.0}, {"code": "590388", "uom": "PCS", "name": "三头敲锈锤锤头22MM（适用于 MS-3NV）/ \nSPARE HAMMER HEAD  FOR MS-3NV 22MM", "group": "工具与设备", "category": "气动工具", "qty": 210.0}, {"code": "590463", "uom": "SET", "name": "气动除锈枪JEX-24/  PNEUMATIC JET CHISELS JEX-24", "group": "工具与设备", "category": "气动工具", "qty": 2.0}, {"code": "590468", "uom": "BOX", "name": "除锈钢针100PCS/ BOX/ \nNEEDLE  3MM X180MM 100PCS/ BOX", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 1886.0}, {"code": "590605", "uom": "PCS", "name": "气动绞盘200KG/ PNEUMATIC DRIVEN WINCHES 200KG", "group": "工具与设备", "category": "气动工具", "qty": 4.0}, {"code": "590607", "uom": "PCS", "name": "气动绞盘300KG/ PNEUMATIC DRIVEN WINCHES 300KG", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "590722", "uom": "SET", "name": "真空吸尘器SP-V500/  PNEUMATIC VACUUM CLEANERS SP-V500", "group": "工具与设备", "category": "气动工具", "qty": 9.0}, {"code": "590790", "uom": "SET", "name": "SEMPO 货舱清洗套件-1/2 （隔膜泵清洗套件）/ SEMPO CARGO HOLD CLEANING SET 1/2 (DIAPHRAGM PUMP CLEANING SET)", "group": "工具与设备", "category": "气动工具", "qty": 2.0}, {"code": "590795", "uom": "SET", "name": "SEMPO 货舱清洗套件-1寸 （隔膜泵清洗套件）/ SEMPO CARGO HOLD CLEANING SET 1 INCH (DIAPHRAGM PUMP CLEANING SET)", "group": "工具与设备", "category": "气动工具", "qty": 2.0}, {"code": "590905", "uom": "SET", "name": "电钻 CD-12C（12V）/ ELECTRIC DRILLS CD-12C (12V)", "group": "工具与设备", "category": "电动工具", "qty": 7.0}, {"code": "590925", "uom": "SET", "name": "无线电动冲击扳手 1/2\"/ CORDLESS IMPACT WRENCHES 1/2 INCH", "group": "工具与设备", "category": "电动工具", "qty": 2.0}, {"code": "591002", "uom": "SET", "name": "110V 电钻 KP-ED10/ 110V ELECTRIC DRILLS KP-ED10", "group": "工具与设备", "category": "电动工具", "qty": 56.0}, {"code": "591003", "uom": "SET", "name": "110V 电钻 KP-ED13/ 110V ELECTRIC DRILLS KP-ED13", "group": "工具与设备", "category": "电动工具", "qty": 22.0}, {"code": "591004", "uom": "SET", "name": "110V 电钻 DRILLS KP-ED16/ 110V ELECTRIC DRILLS KP-ED16", "group": "工具与设备", "category": "电动工具", "qty": 21.0}, {"code": "591012", "uom": "SET", "name": "220V 电钻 KP-ED10/ 220V ELECTRIC DRILLS KP-ED10", "group": "工具与设备", "category": "电动工具", "qty": 55.0}, {"code": "591013", "uom": "SET", "name": "220V 电钻 KP-ED13/ 220V ELECTRIC DRILLS KP-ED13", "group": "工具与设备", "category": "电动工具", "qty": 25.0}, {"code": "591014", "uom": "SET", "name": "220V 电钻 KP-ED16/ 220V ELECTRIC DRILLS KP-ED16", "group": "工具与设备", "category": "电动工具", "qty": 22.0}, {"code": "591021", "uom": "SET", "name": "110V 电动角磨机 KP-100/ 110V ELECTRIC ANGLE GRINDERS KP-100", "group": "工具与设备", "category": "电动工具", "qty": 80.0}, {"code": "591023", "uom": "SET", "name": "110V 电动角磨机 KP-150/ 110V ELECTRIC ANGLE GRINDERS KP-150", "group": "工具与设备", "category": "电动工具", "qty": 15.0}, {"code": "591031", "uom": "SET", "name": "220V 电动角磨机 KP-100/ 220V ELECTRIC ANGLE GRINDERS KP-100", "group": "工具与设备", "category": "电动工具", "qty": 101.0}, {"code": "591033", "uom": "SET", "name": "220V 电动角磨机 KP-150/ 220V ELECTRIC ANGLE GRINDERS KP-150", "group": "工具与设备", "category": "电动工具", "qty": 6.0}, {"code": "591151", "uom": "SET", "name": "110V 电动钢筋切断机/ 110V ELECTRIC ROD CUTTERS", "group": "工具与设备", "category": "电动工具", "qty": 8.0}, {"code": "591156", "uom": "SET", "name": "220V 钢筋切断机/220V ELECTRIC ROD CUTTERS", "group": "工具与设备", "category": "电动工具", "qty": 18.0}, {"code": "591212", "uom": "SET", "name": "除锈机（链条式）KP-1200E 3PH 440V / Electric Scaling Machine (Chain Type) KP-1200E 3PH 440V", "group": "工具与设备", "category": "电动工具", "qty": 4.0}, {"code": "591217", "uom": "SET", "name": "110V 除锈机 KP-50/ 110V ELECTRIC SCALING MACHINE KP-50", "group": "工具与设备", "category": "电动工具", "qty": 15.0}, {"code": "591218", "uom": "SET", "name": "220V 除锈机 KP-50/ 220V ELECTRIC SCALING MACHINE KP-50", "group": "工具与设备", "category": "电动工具", "qty": 23.0}, {"code": "591237", "uom": "SET", "name": "除锈链鼓 40MM X 8MM REPLACEMENT CHAIN HEAD FOR KP-1200E", "group": "工具与设备", "category": "电动工具", "qty": 4.0}, {"code": "59123701", "uom": "SET", "name": "链条主轴 CHIAN SPINDLE FOR KP-1200E", "group": "工具与设备", "category": "电动工具", "qty": 4.0}, {"code": "591253", "uom": "SET", "name": "除锈机软轴（适用于KP-50）/ FLEXIBLE SHAFTS FOR SCALING MACHINE KP-50", "group": "工具与设备", "category": "除锈工具与配件", "qty": 2.0}, {"code": "591255", "uom": "SET", "name": "NO.1 工具头/ NO.1 HD TOOL", "group": "工具与设备", "category": "除锈工具与配件", "qty": 20.0}, {"code": "591256", "uom": "PCS", "name": "NO.1-1切割器/ NO.1-1 CUTTER", "group": "工具与设备", "category": "除锈工具与配件", "qty": 820.0}, {"code": "591257", "uom": "PCS", "name": "NO.1-2 圆盘销/ NO.1-2 DISC PIN", "group": "工具与设备", "category": "除锈工具与配件", "qty": 890.0}, {"code": "591258", "uom": "SET", "name": "NO.1-3 中心螺栓及螺母/ NO.1-3 CENTER BOLT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 0.0}, {"code": "591259", "uom": "PCS", "name": "NO.1-4 圆盘/ DISC NO.1-4", "group": "工具与设备", "category": "除锈工具与配件", "qty": 0.0}, {"code": "591260", "uom": "SET", "name": "NO.2 LG钢丝刷/ NO.2 LG BRUSH", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591261", "uom": "PCS", "name": "NO.2-1 LG刀片/ NO.2-1 LG BLADE", "group": "工具与设备", "category": "除锈工具与配件", "qty": 1000.0}, {"code": "591262", "uom": "PCS", "name": "NO.2-2圆盘销/ NO.2-2 DISC PIN", "group": "工具与设备", "category": "除锈工具与配件", "qty": 1000.0}, {"code": "591263", "uom": "SET", "name": "NO.2-3 中心螺栓及螺母/ NO.2-3 CENTER BOLT NUT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 200.0}, {"code": "591264", "uom": "PCS", "name": "NO.2-4 圆盘/ NO.2-4 DISC", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591265", "uom": "SET", "name": "NO.3 杯型钢丝刷/ NO.3 CUP BRUSH WITH BOLT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "59126502", "uom": "SET", "name": "NO.3 杯型钢丝刷不带螺纹 100X16MM/ NO.3 CUP BRUSH WITHOUT BOLT 100X16MM", "group": "工具与设备", "category": "除锈工具与配件", "qty": 60.0}, {"code": "591266", "uom": "SET", "name": "NO.4 锤头/ NO.4 HAMMER HEAD", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591267", "uom": "PCS", "name": "NO.4-1 锤片/ NO.4-1 HAMMER BLADE", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591268", "uom": "PCS", "name": "NO.4-2 圆盘销/ NO.4-2 DISC PIN", "group": "工具与设备", "category": "除锈工具与配件", "qty": 100.0}, {"code": "591270", "uom": "PCS", "name": "NO.4-4 圆盘/ NO.4-4 DISC", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591271", "uom": "PCS", "name": "锤头套环 P/N.4-5（适用于KP-50/60除锈机）/ HAMMER HEAD COLLAR P/N.4-5,FOR SCALING MACHINE KP-50/60", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591272", "uom": "PCS", "name": "锤头垫片 P/N.4-6（适用于KP-50/60除锈机）/ HAMMER HEAD COLLAR P/N.4-6,FOR SCALING MACHINE KP-50/60", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591273", "uom": "SET", "name": "NO.5 钢丝轮（带螺栓）/ NO.5 WIRE WHEEL BRUSH WITH BOLT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "59127302", "uom": "SET", "name": "NO.5 钢丝轮（不带螺栓）/ NO.5 WIRE WHEEL BRUSH WITHOUT BOLT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591274", "uom": "SET", "name": "NO.6 磨石（带螺栓）/ NO.6 GRIND STONE WITH BOLT", "group": "工具与设备", "category": "除锈工具与配件", "qty": 10.0}, {"code": "591402", "uom": "SET", "name": "110V 通风风机 CTF-20/ 110V VENTILATION FAN CTF-20", "group": "工具与设备", "category": "通风设备", "qty": 42.0}, {"code": "591403", "uom": "SET", "name": "110V 通风风机 CTF-30/ 110V VENTILATION FAN CTF-30", "group": "工具与设备", "category": "通风设备", "qty": 45.0}, {"code": "591404", "uom": "SET", "name": "110V 通风风机 CTF-40/ 110V VENTILATION FAN CTF-40", "group": "工具与设备", "category": "通风设备", "qty": 10.0}, {"code": "591405", "uom": "SET", "name": "110V 通风风机 CTF-50/ 110V VENTILATION FAN CTF-50", "group": "工具与设备", "category": "通风设备", "qty": 0}, {"code": "591406", "uom": "SET", "name": "110V 通风风机 CTF-50/ 220V VENTILATION FAN CTF-20", "group": "工具与设备", "category": "通风设备", "qty": 51.0}, {"code": "591407", "uom": "SET", "name": "220V 通风风机 CTF-30/ 220V VENTILATION FAN CTF-30", "group": "工具与设备", "category": "通风设备", "qty": 31.0}, {"code": "591408", "uom": "SET", "name": "220V 通风风机 CTF-40/ 220V VENTILATION FAN CTF-40", "group": "工具与设备", "category": "通风设备", "qty": 41.0}, {"code": "591409", "uom": "SET", "name": "220V 通风风机 CTF-50/ 220V VENTILATION FAN CTF-50", "group": "工具与设备", "category": "通风设备", "qty": 4.0}, {"code": "59141801", "uom": "SET", "name": "110V手提防爆风机 300MM/ VENTILATION FANS EXPLOSION PROOF 300MM 110V", "group": "工具与设备", "category": "通风设备", "qty": 2.0}, {"code": "59141901", "uom": "SET", "name": "220V手提防爆风机300MM / VENTILATION FANS EXPLOSION PROOF 300MM 220V", "group": "工具与设备", "category": "通风设备", "qty": 7.0}, {"code": "591436", "uom": "SET", "name": "水驱动涡轮风机 WTF-300/ WATER DRIVEN TURBINE FAN WTF-300", "group": "工具与设备", "category": "通风设备", "qty": 0.0}, {"code": "591437", "uom": "SET", "name": "水驱动涡轮风机 WTF-400/ WATER DRIVEN TURBINE FAN WTF-400", "group": "工具与设备", "category": "通风设备", "qty": 0.0}, {"code": "591481", "uom": "ROLL", "name": "通风管 200MM × 5M/ VENTILATION TUBE 200MMX5M", "group": "工具与设备", "category": "通风设备", "qty": 35.0}, {"code": "591482", "uom": "ROLL", "name": "通风管 200MM × 10M/ VENTILATION TUBE 200MMX10M", "group": "工具与设备", "category": "通风设备", "qty": 20.0}, {"code": "591483", "uom": "ROLL", "name": "通风管 300MM × 5M/ VENTILATION TUBE 300MMX5M", "group": "工具与设备", "category": "通风设备", "qty": 46.0}, {"code": "591484", "uom": "ROLL", "name": "通风管 300MM × 10M/ VENTILATION TUBE 300MMX10M", "group": "工具与设备", "category": "通风设备", "qty": 1.0}, {"code": "591485", "uom": "ROLL", "name": "通风管 400MM × 5M/ VENTILATION TUBE 400MMX5M", "group": "工具与设备", "category": "通风设备", "qty": 25.0}, {"code": "591486", "uom": "ROLL", "name": "通风管 400MM × 10M/ VENTILATION TUBE 400MMX10M", "group": "工具与设备", "category": "通风设备", "qty": 9.0}, {"code": "591488", "uom": "ROLL", "name": "通风管 500MM × 10M/ VENTILATION TUBE 500MMX10M", "group": "工具与设备", "category": "通风设备", "qty": 6.0}, {"code": "591601", "uom": "SET", "name": "1英寸气动隔膜泵（铝合金）/ 1 INCH PNEUMATIC DIAPHRAGM PUMP (ALUMINIUM)", "group": "工具与设备", "category": "气动工具", "qty": 9.0}, {"code": "59160104", "uom": "SET", "name": "隔膜（特氟龙）(适用于塑料/TF泵) 1英寸/ DIAPHRAGM/TEFLON FOR PLASTIC/TF PUMP  1 INCH", "group": "工具与设备", "category": "气动工具", "qty": 8.0}, {"code": "59160105", "uom": "SET", "name": "隔膜（BUNA-N）（适用于铝合金/塑料泵）/ DIAPHRAGM/BUNA-N FOR ALUMINIUM/PLASTIC PUMP", "group": "工具与设备", "category": "气动工具", "qty": 40.0}, {"code": "59160105-1", "uom": "SET", "name": "隔膜（特氟龙）（适用于塑料/TF泵） 1.5英寸/ DIAPHRAGM/TEFLON FOR PLASTIC/TF PUMP  1.5 INCH", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "591602", "uom": "SET", "name": "1.5英寸气动隔膜泵（铝合金）/ 1.5 INCH PNEUMATIC DIAPHRAGM PUMP (ALUMINIUM)", "group": "工具与设备", "category": "气动工具", "qty": 9.0}, {"code": "59160205", "uom": "SET", "name": "隔膜（特氟龙）（适用于塑料/TF泵） 2英寸/ DIAPHRAGM/TEFLON FOR PLASTIC/TF PUMP  2 INCH", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "591603", "uom": "SET", "name": "2英寸气动隔膜泵（铝合金）/ 2 INCH PNEUMATIC DIAPHRAGM PUMP (ALUMINIUM)", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "59160305", "uom": "SET", "name": "隔膜（BUNA-N）（适用于铝合金/塑料泵）/ DIAPHRAGM/BUNA-N FOR ALUMINIUM/PLASTIC PUMP", "group": "工具与设备", "category": "气动工具", "qty": 20.0}, {"code": "591604", "uom": "SET", "name": "3英寸气动隔膜泵（铝合金）/ 3 INCH PNEUMATIC DIAPHRAGM PUMP (ALUMINIUM)", "group": "工具与设备", "category": "气动工具", "qty": 7.0}, {"code": "59160405", "uom": "SET", "name": "隔膜（BUNA-N）（适用于铝合金泵）/ DIAPHRAGM/BUNA-N FOR ALUMINIUM PUMP", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "591605", "uom": "SET", "name": "0.5英寸气动隔膜泵（铝合金）/ 0.5 INCH PNEUMATIC DIAPHRAGM PUMP (ALUMINIUM)", "group": "工具与设备", "category": "气动工具", "qty": 11.0}, {"code": "591610", "uom": "SET", "name": "3/8英寸气动隔膜泵（PP）/ 3/8  INCH PNEUMATIC DIAPHRAGM PUMP (PP)", "group": "工具与设备", "category": "气动工具", "qty": 3.0}, {"code": "591611", "uom": "SET", "name": "0.5英寸气动隔膜泵（PP）/ 0.5 INCH PNEUMATIC DIAPHRAGM PUMP (PP)", "group": "工具与设备", "category": "气动工具", "qty": 4.0}, {"code": "59161110", "uom": "SET", "name": "隔膜（特氟龙）(适用于塑料/TF泵 0.5英寸)/ DIAPHRAGM/TEFLON FOR PLASTIC/TF PUMP  0.5 INCH", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "59161111", "uom": "SET", "name": "隔膜（BUNA-N）(适用于塑料泵)/ DIAPHRAGM/BUNA-N FOR PLASTIC PUMP", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "5916111101", "uom": "SET", "name": "隔膜（BUNA-N）(适用于铝合金泵)/ DIAPHRAGM/BUNA-N FOR ALUMINIUM  PUMP", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "591612", "uom": "SET", "name": "1英寸气动隔膜泵（PP）/ 1 INCH PNEUMATIC DIAPHRAGM PUMP (PP)", "group": "工具与设备", "category": "气动工具", "qty": 1.0}, {"code": "591613", "uom": "SET", "name": "1.5英寸气动隔膜泵（PP）/ 1.5 INCH PNEUMATIC DIAPHRAGM PUMP (PP)", "group": "工具与设备", "category": "气动工具", "qty": 6.0}, {"code": "591614", "uom": "SET", "name": "2英寸气动隔膜泵（PP）/ 2 INCH PNEUMATIC DIAPHRAGM PUMP (PP)", "group": "工具与设备", "category": "气动工具", "qty": 12.0}, {"code": "591635", "uom": "SET", "name": "气动污水泵 40MM 20立方/ PNEUMATIC SUMP PUMP 40MM 20 CUBIC", "group": "工具与设备", "category": "气动工具", "qty": 10.0}, {"code": "591637", "uom": "SET", "name": "气动污水泵 40MM 30立方/ PNEUMATIC SUMP PUMP 50MM 30 CUBIC", "group": "工具与设备", "category": "气动工具", "qty": 3.0}, {"code": "591651", "uom": "SET", "name": "铝合金双向排吸泵 SP-PP51/ \nPNEUMATIC DRUM PUMPS SP-PP51", "group": "工具与设备", "category": "气动工具", "qty": 11.0}, {"code": "613056", "uom": "SET", "name": "冲孔工具组 6–38MM/ PUNCHING TOOL SETS 6-38MM", "group": "五金与通用器材", "category": "凿冲工具", "qty": 1.0}, {"code": "613065", "uom": "SET", "name": "中心冲9件套CRV/ CENTER PUNCH  SETS 9PCS CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 20.0}, {"code": "613066", "uom": "SET", "name": "中心冲12件套 CRV/ CENTER PUNCH SETS 12PCS CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 12.0}, {"code": "613080", "uom": "SET", "name": "销冲8件套 CRV/ \nPIN PUNCH SETS 8PCS  CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 23.0}, {"code": "613086", "uom": "SET", "name": "平凿冲7件套 CRV/ COMBINATION CHISEL SETS 7PCS  CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 23.0}, {"code": "613088", "uom": "SET", "name": "混合组套7件套CRV/ CHISEL&PUNCH SETS COMBINATION 7PCS  CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 25.0}, {"code": "613089", "uom": "SET", "name": "混合组套12件套 CRV/ CHISEL&PUNCH SETS COMBINATION 12PCS  CRV", "group": "五金与通用器材", "category": "凿冲工具", "qty": 20.0}, {"code": "613133", "uom": "SET", "name": "1英寸字母数字模板套装（25MM）/ 1 INCH STENCIL LETTER AND FIGURE SET (25MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 9.0}, {"code": "613135", "uom": "SET", "name": "1.5英寸字母数字模板套装（38MM）/ 1.5 INCH STENCIL LETTER AND FIGURE SET (38MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 8.0}, {"code": "613137", "uom": "SET", "name": "2英寸字母数字模板套装（50MM）/ 2 INCH STENCIL LETTER AND FIGURE SET (50MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 8.0}, {"code": "613138", "uom": "SET", "name": "2.5英寸字母数字模板套装（60MM）/ 2.5 INCH STENCIL LETTER AND FIGURE SET (60MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 9.0}, {"code": "613139", "uom": "SET", "name": "3英寸字母数字模板套装（75MM）/ 3 INCH STENCIL LETTER AND FIGURE SET (75MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 8.0}, {"code": "613140", "uom": "SET", "name": "4英寸字母数字模板套装（100MM）/ 4 INCH STENCIL LETTER AND FIGURE SET(100MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 6.0}, {"code": "613143", "uom": "SET", "name": "1英寸字母模板 26件套（25MM）/ 1 INCH STENCIL LETTER SET 26PCS (25MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613145", "uom": "SET", "name": "1.5英寸字母模板 26件套（38MM）/ 1.5 INCH STENCIL LETTER SET 26PCS (38MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613147", "uom": "SET", "name": "2英寸字母模板 26件套（50MM）/ 2 INCH STENCIL LETTER SET 26PCS (50MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 19.0}, {"code": "613148", "uom": "SET", "name": "2.5英寸字母模板 26件套（60MM）/ 2.5 INCH STENCIL LETTER SET 26PCS (60MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613149", "uom": "SET", "name": "3英寸字母模板 26件套（75MM）/ 3 INCH STENCIL LETTER SET 26PCS (75MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613150", "uom": "SET", "name": "4英寸字母模板 26件套（100MM）/ 4 INCH STENCIL LETTER SET 26PCS (100MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 19.0}, {"code": "613153", "uom": "SET", "name": "1英寸数字模板 10件套（25MM）/ 1 INCH STENCIL FIGURE SET 10PCS (25MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613155", "uom": "SET", "name": "1.5英寸数字模板 10件套（38MM）/ 1.5 INCH STENCIL FIGURE SET 10PCS (38MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613157", "uom": "SET", "name": "2英寸数字模板 10件套（50MM）/ 2 INCH STENCIL FIGURE SET 10PCS (50MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613158", "uom": "SET", "name": "2.5英寸数字模板 10件套（60MM）/ 2.5 INCH STENCIL FIGURE SET 10PCS (60MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613159", "uom": "SET", "name": "3英寸数字模板 10件套（75MM）/ 3 INCH STENCIL FIGURE SET 10PCS (75MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613160", "uom": "SET", "name": "4英寸数字模板 10件套（100MM）/ 4 INCH STENCIL FIGURE SET 10PCS (100MM)", "group": "工具与设备", "category": "喷漆涂装设备", "qty": 20.0}, {"code": "613711", "uom": "SET", "name": "整体式液压弯管机 \nHYDRAULIC PIPE BENDERS 2\" 12TON", "group": "工具与设备", "category": "电动工具", "qty": 13.0}, {"code": "614025", "uom": "PCS", "name": "两爪油桶钩_承重0.5T_链条0.43MTR DRUM HOOK FOR 1 DRUM", "group": "五金与通用器材", "category": "其它五金", "qty": 8.0}, {"code": "614026", "uom": "PCS", "name": "四爪油桶钩_承重1T_链条1MTRS  CHAIN TYPE DRUM HOOK FOR 2 DRUMS", "group": "五金与通用器材", "category": "其它五金", "qty": 6.0}, {"code": "614065", "uom": "PCS", "name": "不锈钢卡箍 8MM-14MM/ STAINLESS STEEL SS304 HOSE BAND 8MM-14MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "614066", "uom": "PCS", "name": "不锈钢卡箍 11MM-17MM/ STAINLESS STEEL SS304 HOSE BAND 11MM-17MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1771.0}, {"code": "614067", "uom": "PCS", "name": "不锈钢卡箍 13MM-20MM/ STAINLESS STEEL SS304 HOSE BAND 13MM-20MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1850.0}, {"code": "614068", "uom": "PCS", "name": "不锈钢卡箍 15MM-24MM/ STAINLESS STEEL SS304 HOSE BAND 15MM-24MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1806.0}, {"code": "614069", "uom": "PCS", "name": "不锈钢卡箍 22MM-32MM/ STAINLESS STEEL SS304 HOSE BAND 22MM-32MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 0.0}, {"code": "614070", "uom": "PCS", "name": "不锈钢卡箍 32MM-44MM/ STAINLESS STEEL SS304 HOSE BAND 32MM-44MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1717.0}, {"code": "614071", "uom": "PCS", "name": "不锈钢卡箍 46MM-56MM/ STAINLESS STEEL SS304 HOSE BAND 46MM-56MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1688.0}, {"code": "614072", "uom": "PCS", "name": "不锈钢卡箍 58MM-75MM/ STAINLESS STEEL SS304 HOSE BAND  58MM-75MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1758.0}, {"code": "614073", "uom": "PCS", "name": "不锈钢卡箍 68MM-85MM/ STAINLESS STEEL SS304 HOSE BAND 68MM-85MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 2042.0}, {"code": "614074", "uom": "PCS", "name": "不锈钢卡箍 77MM-95MM/ STAINLESS STEEL SS304 HOSE BAND  77MM-95MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 3219.0}, {"code": "614075", "uom": "PCS", "name": "不锈钢卡箍 87MM-112MM/ STAINLESS STEEL SS304 HOSE BAND  87MM-112MM", "group": "五金与通用器材", "category": "连接件与紧固件", "qty": 1855.0}, {"code": "617183", "uom": "PC", "name": "手推车 885*575*195 400KG/ TROLLEY 885*575*195 400KG", "group": "五金与通用器材", "category": "其他类别", "qty": 48.0}, {"code": "617412", "uom": "PCS", "name": "高压黄油枪带软管_14X1/ GREASE GUN WITH SWIVEL JOINT 14×1", "group": "工具与设备", "category": "润滑与测量工具", "qty": 18.0}, {"code": "617415", "uom": "PCS", "name": "黄油泵三联旋转接头/ TRIPLE SWICEL JOINT FOR GREASE PUMP", "group": "工具与设备", "category": "润滑与测量工具", "qty": 5.0}, {"code": "617501", "uom": "SET", "name": "气动注油机润滑器/ GREASE LUBRICATORS FOR AIR OPERATIONED", "group": "工具与设备", "category": "润滑与测量工具", "qty": 17.0}, {"code": "61750101", "uom": "SET", "name": "气动注油机SP-GL50/ GREASE LUBRICATORS  SP-GL50", "group": "工具与设备", "category": "润滑与测量工具", "qty": 18.0}, {"code": "617556", "uom": "ROLL", "name": "黄油软管 1/4\"×10M/ GREASE HOSE 1/4X10M", "group": "工具与设备", "category": "润滑与测量工具", "qty": 31.0}, {"code": "617565", "uom": "PCS", "name": "高压黄油枪外螺纹(14X1)_平口硬管/GREASE GUN WITH SWIVEL JOINT (14×1)", "group": "工具与设备", "category": "润滑与测量工具", "qty": 17.0}, {"code": "617680", "uom": "PCS", "name": "针式油枪软管 360MM 1/8 INCH/ FLEXIBLE EXTENSION  HOSE PIN TYPE  360MM 1/8 INCH", "group": "工具与设备", "category": "润滑与测量工具", "qty": 377.0}, {"code": "617681", "uom": "PCS", "name": "纽扣式油枪软管370MM 1/8 英尺/  FLEXIBLE EXTENSION  HOSE BUTTON TYPE 370MM 1/8 INCH", "group": "工具与设备", "category": "润滑与测量工具", "qty": 52.0}, {"code": "617682", "uom": "PCS", "name": "直式油枪软管340MM 1/8 英尺/ FLEXIBLE EXTENSION  HOSE  STRAIGHT TYPE 340MM 1/8 INCH", "group": "工具与设备", "category": "润滑与测量工具", "qty": 425.0}, {"code": "650822", "uom": "PCS", "name": "凸面尺 3.5米/ CONVEX RULER 3.5M", "group": "五金与通用器材", "category": "卷尺", "qty": 377.0}, {"code": "650823", "uom": "PCS", "name": "凸面尺 5M/ CONVEX RULER 5M", "group": "五金与通用器材", "category": "卷尺", "qty": 423.0}, {"code": "650876", "uom": "PCS", "name": "不锈钢测油尺 15M/ S.STEEL OIL GAUGING TAPE 15M", "group": "工具与设备", "category": "润滑与测量工具", "qty": 132.0}, {"code": "650877", "uom": "PCS", "name": "不锈钢测油尺 20M/ S.STEEL OIL GAUGING TAPE 20M", "group": "工具与设备", "category": "润滑与测量工具", "qty": 85.0}, {"code": "650878", "uom": "PCS", "name": "不锈钢测油尺 30M/ S.STEEL OIL GAUGING TAPE 30M", "group": "工具与设备", "category": "润滑与测量工具", "qty": 84.0}, {"code": "650879", "uom": "PCS", "name": "不锈钢测油尺 50M/ S.STEEL OIL GAUGING TAPE 50M", "group": "工具与设备", "category": "润滑与测量工具", "qty": 191.0}, {"code": "652654", "uom": "PAD", "name": "马力测量纸65X181MM/  INDICATOR PAPER 65X181MM", "group": "五金与通用器材", "category": "其它五金", "qty": 20.0}, {"code": "652655", "uom": "PAD", "name": "马力测量纸 66X146MM/ INDICATOR PAPER 66X146MM", "group": "五金与通用器材", "category": "其它五金", "qty": 20.0}, {"code": "72MM", "uom": "COIL", "name": "八股尼龙缆绳 72MM × 11M（9寸）/ 8-STRAND NYLON DIA 72MM X 11 MTR / 9寸", "group": "缆绳", "category": "缆绳本体", "qty": 67.0}, {"code": "792201", "uom": "PCS", "name": "防爆手电/ EXPLOSION-PROOF FLASHLIGHT", "group": "个人防护与劳保", "category": "防爆照明", "qty": 228.0}, {"code": "80MM", "uom": "COIL", "name": "八股尼龙缆绳 80MM × 11M（10寸）/ 8-STRAND NYLON DIA 80MM X 11 M / 10寸", "group": "缆绳", "category": "缆绳本体", "qty": 1.0}, {"code": "851116", "uom": "pc", "name": "PC轻便式烧焊面罩/ PC PORTABLE WELDING FACE SHIELD", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 183.0}, {"code": "851121", "uom": "pc", "name": "烧焊面罩/ WELDING FACE SHIELD", "group": "个人防护与劳保", "category": "护目与面部防护", "qty": 429.0}, {"code": "851163", "uom": "PAIR", "name": "电焊手套/ WELDER GLOVES", "group": "个人防护与劳保", "category": "防护手套", "qty": 1776.0}, {"code": "88MM", "uom": "COIL", "name": "八股尼龙缆绳 88MM × 11M（11寸）/ 8-STRAND NYLONE DIA 88MM X 11 M / 11寸", "group": "缆绳", "category": "缆绳本体", "qty": 26.0}, {"code": "8-S-32MM", "uom": "COIL", "name": "八股混合纤维缆绳 32MM × 220M（4寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 32MM X 220MTR / 4寸", "group": "缆绳", "category": "缆绳本体", "qty": 18.0}, {"code": "8-S-36MM", "uom": "COIL", "name": "八股混合纤维缆绳 36MM × 220M（4.5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 36MM X 220MTR / 4.5寸", "group": "缆绳", "category": "缆绳本体", "qty": 25.0}, {"code": "8-S-40MM", "uom": "COIL", "name": "八股混合纤维缆绳 40MM × 220M（5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 40MM X 220MTR / 5寸", "group": "缆绳", "category": "缆绳本体", "qty": 6.0}, {"code": "8-S-44MM", "uom": "COIL", "name": "八股混合纤维缆绳 44MM × 220M（5.5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 44MM X 220MTR / 5.5寸", "group": "缆绳", "category": "缆绳本体", "qty": 8.0}, {"code": "8-S-48MM", "uom": "COIL", "name": "八股混合纤维缆绳 48MM × 220M（6寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 48MM X 220MTR / 6寸", "group": "缆绳", "category": "缆绳本体", "qty": 22.0}, {"code": "8-S-52MM", "uom": "COIL", "name": "八股混合纤维缆绳 52MM × 220M（6.5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 52MM X 220MTR / 6.5寸", "group": "缆绳", "category": "缆绳本体", "qty": 16.0}, {"code": "8-S-56MM", "uom": "COIL", "name": "八股混合纤维缆绳 56MM × 220M（7寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 56MM X 220MTR / 7寸", "group": "缆绳", "category": "缆绳本体", "qty": 21.0}, {"code": "8-S-60MM", "uom": "COIL", "name": "八股混合纤维缆绳 60MM × 220M（7.5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 60MM X 220MTR / 7.5寸", "group": "缆绳", "category": "缆绳本体", "qty": 26.0}, {"code": "8-S-64MM", "uom": "COIL", "name": "八股混合纤维缆绳 64MM × 220M（8寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 64MM X 220MTR / 8寸", "group": "缆绳", "category": "缆绳本体", "qty": 28.0}, {"code": "8-S-64MM-110MTR", "uom": "COIL", "name": "八股混合纤维缆绳 64MM × 110M（8寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 64MM X 110MTR / 8寸", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "8-S-68MM", "uom": "COIL", "name": "八股混合纤维缆绳 68MM × 220M（8.5寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 68MM X 220MTR / 8.5寸", "group": "缆绳", "category": "缆绳本体", "qty": 28.0}, {"code": "8-S-72MM", "uom": "COIL", "name": "八股混合纤维缆绳 72MM × 220M（9寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 72MM X 220MTR / 9寸", "group": "缆绳", "category": "缆绳本体", "qty": 41.0}, {"code": "8-S-72MM-110MTR", "uom": "COIL", "name": "八股混合纤维缆绳 72MM × 110M（9寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 72MM X 110MTR / 9寸", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "8-S-80MM", "uom": "COIL", "name": "八股混合纤维缆绳 80MM × 220M（10寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 80MM X 220MTR / 10寸", "group": "缆绳", "category": "缆绳本体", "qty": 19.0}, {"code": "8-S-80MM-110MTR", "uom": "COIL", "name": "八股混合纤维缆绳 80MM × 110M（10寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 80MM X 110MTR / 10寸", "group": "缆绳", "category": "缆绳本体", "qty": 0.0}, {"code": "8-S-80MM-28MTR", "uom": "COIL", "name": "八股混合纤维缆绳 80MM × 28M（10寸）/ 8-STRAND POLYESTER/POLYPROPYLENE DIA 80MM X 28MTR / 10寸", "group": "缆绳", "category": "缆绳本体", "qty": 2.0}, {"code": "96MM", "uom": "COIL", "name": "八股尼龙缆绳 96MM × 11M（12寸）/ 8-STRAND NYLON DIA 96MM X 11 MTR / 12寸", "group": "缆绳", "category": "缆绳本体", "qty": 19.0}, {"code": "AIS-XA1988D", "uom": "PCS", "name": "船载AIS自动识别系统  XA-1988D/ SHIPBORNE AIS SYSTEM XA-1988D", "group": "船舶仪器", "category": "导航与通信设备", "qty": 1.0}, {"code": "BLA-CY2-X23060", "uom": "PCS", "name": "15PPM舱底水报警装置 CY-2 X23060 110V/ 15PPM BILGE ALARM CY-2 X23060 110V", "group": "船舶仪器", "category": "报警装置", "qty": 1.0}, {"code": "BLA-CY2-X23061", "uom": "PCS", "name": "15PPM舱底水报警装置 CY-2 X23061 110V/ 15PPM BILGE ALARM CY-2 X23061 110V", "group": "船舶仪器", "category": "报警装置", "qty": 1.0}, {"code": "BLA-CY2-X23062", "uom": "PCS", "name": "15PPM舱底水报警装置 CY-2 X23062 110V/ 15PPM BILGE ALARM CY-2 X23062 110V", "group": "船舶仪器", "category": "报警装置", "qty": 1.0}, {"code": "BLA-CY2-X23064", "uom": "PCS", "name": "15PPM舱底水报警装置 CY-2 X23064 220V / 15PPM BILGE ALARM CY-2 X23064 220V", "group": "船舶仪器", "category": "报警装置", "qty": 1.0}, {"code": "RAI-QSEAV1-50", "uom": "PCS", "name": "舵角指示器 QSEAV-1 50° 信号：3-12-21V/ RUDDER ANGLE INDICATOR QSEAV-1 50° SIGNAL: 3-12-21V", "group": "船舶仪器", "category": "仪表", "qty": 3.0}, {"code": "RAI-QSEAV2-35", "uom": "PCS", "name": "舵角指示器 QSEAV-2 35° 信号：±10V/  RUDDER ANGLE INDICATOR QSEAV-2 35° SIGNAL: ±10V", "group": "船舶仪器", "category": "仪表", "qty": 2.0}, {"code": "RAI-QSEAV2-45", "uom": "PCS", "name": "舵角指示器 QSEAV-2 45° 信号：±10V/ RUDDER ANGLE INDICATOR QSEAV-2 45° SIGNAL: ±10V", "group": "船舶仪器", "category": "仪表", "qty": 3.0}, {"code": "RPM-QSBRV2-100R", "uom": "PCS", "name": "主机转速表 QSBRV-2 100 RPM 右侧正车 信号：±10V/ Engine RPM Indicator QSBRV-2 100 RPM Right SIGNAL: ±10V", "group": "船舶仪器", "category": "仪表", "qty": 1.0}, {"code": "RPM-QSBRV2-120L", "uom": "PCS", "name": "主机转速表 QSBRV-2 120 RPM 左侧正车 信号：±10V/ ENGINE RPM INDICATOR QSBRV-2 120 RPM LEFT SIGNAL:±10V", "group": "船舶仪器", "category": "仪表", "qty": 2.0}, {"code": "RPM-QSBRV2-120R", "uom": "PCS", "name": "主机转速表 QSBRV-2 120 RPM 右侧正车 信号：±10V / Engine RPM Indicator QSBRV-2 120 RPM Right SIGNAL:±10V", "group": "船舶仪器", "category": "仪表", "qty": 2.0}, {"code": "RPM-QSEAV2-150L", "uom": "PCS", "name": "主机转速表 QSEAV-2 150 RPM 左侧正车 信号：±10V / ENGINE RPM INDICATOR QSEAV-2 150 RPM LEFT SIGNAL: ±10V", "group": "船舶仪器", "category": "仪表", "qty": 3.0}, {"code": "RPM-QSEAV2-150R", "uom": "PCS", "name": "主机转速表 QSEAV-2 150 RPM 右侧正车 信号：±10V / ENGINE RPM INDICATOR QSEAV-2 150 RPM RIGHT SIGNAL: ±10V", "group": "船舶仪器", "category": "仪表", "qty": 3.0}, {"code": "RPM-QSEAV3-120P", "uom": "PCS", "name": "主机转速表 QSEAV-3 0–120% 信号：0-10V/ ENGINE RPM INDICATOR QSEAV-3 0–120% SIGNAL: 0-10V", "group": "船舶仪器", "category": "仪表", "qty": 1.0}, {"code": "WS-AM708", "uom": "PCS", "name": "风速风向仪 AM708/ WIND SPEED & DIRECTION INDICATOR AM708", "group": "船舶仪器", "category": "导航与通信设备", "qty": 2.0}, {"code": "变径", "uom": "PCS", "name": "钢制异径管（变径） ANSI 150  4''X10''/ REDUCER STEEL ANSI 150  4''X10''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 1.0}, {"code": "变径-1", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 6\"×10\"/ REDUCER STEEL ANSI 150  6''X10''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 2.0}, {"code": "变径-2", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 8\"×10\"/ REDUCER STEEL ANSI 150  8''X10''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 0.0}, {"code": "变径-3", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 10\"×16\"/ REDUCER STEEL ANSI 150  10''X16''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 5.0}, {"code": "变径-4", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 10\"×20\"/ REDUCER STEEL ANSI 150  10''X20''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 4.0}, {"code": "变径-5", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 12\"×16\"/ REDUCER STEEL ANSI 150  12''X16''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 0.0}, {"code": "变径-6", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 12\"×24\"/ REDUCER STEEL ANSI 150  12''X24''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 2.0}, {"code": "变径-7", "uom": "PCS", "name": "钢制异径管（变径） ANSI150 14\"×16\"/ REDUCER STEEL ANSI 150  14''X16''", "group": "变径REDUCE", "category": "连接件与紧固件", "qty": 3.0}];
+
+let stockState = { group: null, category: null, searchQuery: '' };
+
+function renderStockGroups() {
+  // Reset sub-views
+  document.getElementById('stock-group-view').style.display = 'block';
+  document.getElementById('stock-category-view').style.display = 'none';
+  document.getElementById('stock-items-view').style.display = 'none';
+
+  // Get unique groups with item counts
+  const groups = {};
+  STOCK_ITEMS.forEach(i => {
+    groups[i.group] = (groups[i.group] || 0) + 1;
+  });
+
+  const html = Object.entries(groups)
+    .sort((a,b) => b[1] - a[1])
+    .map(([g, count]) => `<div class="card-row" onclick="openStockGroup('${encodeURIComponent(g)}')">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:500;color:var(--text)">${g}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${count} 个商品</div>
+      </div>
+      <span style="color:var(--text-3);font-size:18px">›</span>
+    </div>`).join('');
+  document.getElementById('stockGroupList').innerHTML = html;
+}
+
+function openStockGroup(encodedGroup) {
+  const group = decodeURIComponent(encodedGroup);
+  stockState.group = group;
+  stockState.category = null;
+
+  // Get categories under this group
+  const cats = {};
+  STOCK_ITEMS.filter(i => i.group === group).forEach(i => {
+    cats[i.category] = (cats[i.category] || 0) + 1;
+  });
+
+  document.getElementById('stock-group-view').style.display = 'none';
+  document.getElementById('stock-category-view').style.display = 'block';
+  document.getElementById('stock-items-view').style.display = 'none';
+  document.getElementById('topbarTitle').textContent = group;
+  document.getElementById('backBtn').style.display = 'flex';
+  S.pageStack.push({ id: 'stock', title: '库存', sub: null });
+
+  const html = Object.entries(cats)
+    .sort((a,b) => b[1] - a[1])
+    .map(([c, count]) => `<div class="card-row" onclick="openStockCategory('${encodeURIComponent(c)}')">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:500;color:var(--text)">${c}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${count} 个商品</div>
+      </div>
+      <span style="color:var(--text-3);font-size:18px">›</span>
+    </div>`).join('');
+  document.getElementById('stockCategoryList').innerHTML = html;
+  window.scrollTo(0,0);
+}
+
+function openStockCategory(encodedCat) {
+  const cat = decodeURIComponent(encodedCat);
+  stockState.category = cat;
+  stockState.searchQuery = '';
+  document.getElementById('stockSearch').value = '';
+  document.getElementById('stockSearchClear').style.display = 'none';
+
+  document.getElementById('stock-category-view').style.display = 'none';
+  document.getElementById('stock-items-view').style.display = 'block';
+  document.getElementById('topbarTitle').textContent = cat;
+  S.pageStack.push({ id: 'stock-cat', title: stockState.group, sub: null });
+  document.getElementById('backBtn').style.display = 'flex';
+
+  renderStockItems();
+  window.scrollTo(0,0);
+}
+
+function renderStockItems() {
+  const q = stockState.searchQuery.toLowerCase();
+  let items = STOCK_ITEMS.filter(i => i.group === stockState.group && i.category === stockState.category);
+  if (q) items = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q));
+
+  document.getElementById('stockSearchMeta').textContent = q
+    ? `找到 ${items.length} 个商品`
+    : `共 ${items.length} 个商品`;
+
+  if (!items.length) {
+    document.getElementById('stockItemsList').innerHTML = '<div class="card-plain" style="text-align:center;padding:24px;color:var(--text-2);font-size:14px">没有符合的商品</div>';
+    return;
+  }
+
+  document.getElementById('stockItemsList').innerHTML = items.map(item => {
+    const qtyColor = item.qty <= 0 ? 'var(--red)' : item.qty <= 10 ? 'var(--amber)' : 'var(--green)';
+    const qtyLabel = item.qty <= 0 ? '缺货' : item.qty <= 10 ? '库存偏低' : '库存充足';
+    return `<div style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:2px">${item.code}</div>
+          <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.35">${item.name}</div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:3px">UOM: ${item.uom}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:18px;font-weight:700;color:${qtyColor}">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}</div>
+          <div style="font-size:10px;color:${qtyColor};font-weight:500">${qtyLabel}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + '<div style="height:1px"></div>';
+}
+
+function onStockSearch(input) {
+  stockState.searchQuery = input.value.trim();
+  document.getElementById('stockSearchClear').style.display = stockState.searchQuery ? 'flex' : 'none';
+  renderStockItems();
+}
+function clearStockSearch() {
+  stockState.searchQuery = '';
+  document.getElementById('stockSearch').value = '';
+  document.getElementById('stockSearchClear').style.display = 'none';
+  renderStockItems();
+}
+
+</script>
+</body>
+</html>
