@@ -147,6 +147,13 @@ input[type="file"]{display:none}
 
 .toast{position:fixed;bottom:calc(80px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(30,30,30,0.92);color:#fff;padding:10px 20px;border-radius:24px;font-size:14px;font-weight:500;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:999}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.notif-banner{position:fixed;top:calc(-90px);left:0;right:0;z-index:998;padding:8px 12px;transition:top .35s cubic-bezier(.175,.885,.32,1.1)}
+.notif-banner.show{top:0}
+.notif-inner{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--color-border-tertiary);padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.12);cursor:pointer;max-width:480px;margin:0 auto}
+.notif-icon{width:38px;height:38px;border-radius:var(--radius);background:#FCEBEB;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.notif-title{font-size:14px;font-weight:500;color:var(--text)}
+.notif-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.notif-close{margin-left:auto;font-size:18px;color:var(--text-3);flex-shrink:0;padding:2px 4px}
 
 /* Loading overlay */
 .loading{position:fixed;inset:0;background:rgba(255,255,255,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px;font-size:14px;color:var(--text-2)}
@@ -215,6 +222,17 @@ input[type="file"]{display:none}
 
       <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">其他功能</div>
       <div style="color:var(--text-3);font-size:13px;padding:12px 4px">更多功能即将推出</div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">通知设置</div>
+      <div class="card">
+        <div class="card-row" style="cursor:default">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">新订单推送通知</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">有新订单时锁屏推送提醒</div>
+          </div>
+          <button id="pushPermBtn" class="btn btn-sm" onclick="requestPushPermission()">🔔 开启推送通知</button>
+        </div>
+      </div>
 
     </div>
   </div>
@@ -336,6 +354,16 @@ input[type="file"]{display:none}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="notif-banner" id="notifBanner" onclick="notifTapped()">
+  <div class="notif-inner">
+    <div class="notif-icon">📦</div>
+    <div style="flex:1;min-width:0">
+      <div class="notif-title" id="notifTitle">新订单</div>
+      <div class="notif-sub" id="notifSub">点击查看</div>
+    </div>
+    <span class="notif-close" onclick="dismissNotif(event)">✕</span>
+  </div>
+</div>
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────
@@ -344,6 +372,7 @@ const API = window.BACKEND_URL || '';
 
 // ─── STATE ───────────────────────────────────────────────
 const S = {
+  knownOrderIds: new Set(),
   tab: 'orders',
   pageStack: [],
   currentOrder: null,
@@ -387,7 +416,12 @@ function connectSSE() {
   };
 
   es.addEventListener('orders_updated', e => {
-    S.orders = JSON.parse(e.data);
+    const newOrders = JSON.parse(e.data);
+    // Detect newly added orders
+    const added = newOrders.filter(o => !S.knownOrderIds.has(o.id));
+    S.orders = newOrders;
+    S.orders.forEach(o => S.knownOrderIds.add(o.id));
+    if (added.length > 0) showOrderNotif(added);
     if (S.tab === 'orders') updateHomePage();
     if (currentPageId() === 'order-list') renderOrderList();
     if (S.tab === 'admin')  renderAdminList();
@@ -737,6 +771,7 @@ async function handleFileUpload(input) {
 (async () => {
   try {
     await Promise.all([loadAll(), loadStock()]);
+    S.orders.forEach(o => S.knownOrderIds.add(o.id));
     updateHomePage();
   } catch (e) {
     document.getElementById('loading').innerHTML = '<div style="text-align:center;padding:32px;color:#A32D2D"><div style="font-size:32px;margin-bottom:12px">⚠️</div><div style="font-size:15px;font-weight:500">无法连接服务器</div><div style="font-size:13px;color:#6b6b67;margin-top:6px">请检查网络或联系管理员</div></div>';
@@ -986,6 +1021,7 @@ function goToReports() {
 }
 
 function updateHomePage() {
+  updatePushBtn();
   const pending  = S.orders.filter(o => orderStatus(o) !== 'done').length;
   const active   = S.orders.filter(o => orderStatus(o) !== 'done').length;
   const badge    = document.getElementById('homeOrderBadge');
@@ -997,6 +1033,125 @@ function updateHomePage() {
   if (rSub)  rSub.textContent = S.reports.length ? `共 ${S.reports.length} 笔报告` : '暂无报告';
   if (tabDot) tabDot.classList.toggle('has-badge', pending > 0);
 }
+
+
+// ─── NOTIFICATIONS ───────────────────────────────────────
+let _notifTimer = null;
+let _notifOrderId = null;
+
+function showOrderNotif(addedOrders) {
+  const count = addedOrders.length;
+  _notifOrderId = addedOrders[0].id;
+  document.getElementById('notifTitle').textContent = count === 1
+    ? `新订单：${addedOrders[0].id}`
+    : `${count} 个新订单`;
+  document.getElementById('notifSub').textContent = count === 1
+    ? `${addedOrders[0].items ? addedOrders[0].items.length + ' 个品项 · ' : ''}点击开始拣货`
+    : `点击查看订单列表`;
+  const banner = document.getElementById('notifBanner');
+  banner.classList.add('show');
+  if (_notifTimer) clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(dismissNotif, 8000);
+}
+
+function notifTapped() {
+  dismissNotif();
+  // Navigate to order list
+  if (S.tab !== 'orders') {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-orders').classList.add('active');
+    S.tab = 'orders'; S.pageStack = [];
+    document.getElementById('backBtn').style.display = 'none';
+    showPage('orders', '首页');
+    updateHomePage();
+  }
+  setTimeout(() => goToOrders(), 100);
+}
+
+function dismissNotif(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('notifBanner').classList.remove('show');
+  if (_notifTimer) { clearTimeout(_notifTimer); _notifTimer = null; }
+}
+
+
+// ─── WEB PUSH ─────────────────────────────────────────────
+let _swReg = null;
+
+async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    _swReg = await navigator.serviceWorker.register('/sw.js');
+    // Listen for messages from SW (notification click)
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'NEW_ORDER') goToOrders();
+    });
+    // Auto-subscribe if already granted
+    if (Notification.permission === 'granted') {
+      await subscribePush();
+    }
+  } catch (err) { console.warn('SW register failed:', err); }
+}
+
+async function subscribePush() {
+  if (!_swReg) return;
+  try {
+    // Get VAPID public key from backend
+    const { publicKey } = await apiFetch('/api/push/vapid-public');
+    const sub = await _swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await apiFetch('/api/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+  } catch (err) { console.warn('Push subscribe failed:', err); }
+}
+
+async function requestPushPermission() {
+  if (!('Notification' in window)) {
+    showToast('此设备不支持推送通知'); return;
+  }
+  if (Notification.permission === 'granted') {
+    await subscribePush();
+    showToast('✓ 推送通知已开启'); return;
+  }
+  if (Notification.permission === 'denied') {
+    showToast('请在浏览器设置中允许通知权限'); return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    await subscribePush();
+    showToast('✓ 推送通知已开启');
+    updatePushBtn();
+  } else {
+    showToast('已取消，将不会收到推送通知');
+  }
+}
+
+function updatePushBtn() {
+  const btn = document.getElementById('pushPermBtn');
+  if (!btn) return;
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    btn.style.display = 'none'; return;
+  }
+  if (Notification.permission === 'granted') {
+    btn.textContent = '✓ 推送通知已开启';
+    btn.className = 'btn btn-success btn-sm';
+    btn.onclick = null;
+  } else {
+    btn.textContent = '🔔 开启推送通知';
+    btn.className = 'btn btn-sm';
+    btn.onclick = requestPushPermission;
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw     = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+initPush();
 
 </script>
 </body>
