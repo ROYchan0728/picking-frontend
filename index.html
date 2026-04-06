@@ -187,7 +187,7 @@ input[type="file"]{display:none}
     <div style="padding:0 16px 16px">
 
       <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">拣货</div>
-      <div class="card" onclick="goToOrders()" style="cursor:pointer;margin-bottom:10px">
+      <div class="card" onclick="goToOrders()" style="cursor:pointer;margin-bottom:8px">
         <div class="card-row" style="gap:14px">
           <div style="width:44px;height:44px;border-radius:var(--radius);background:var(--green-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📦</div>
           <div style="flex:1;min-width:0">
@@ -196,6 +196,18 @@ input[type="file"]{display:none}
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="badge b-out" id="homeOrderBadge" style="display:none"></span>
+            <span style="color:var(--text-3);font-size:18px">›</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" onclick="goToReports()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:#E6F1FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📋</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">拣货报告</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="homeReportSub">载入中...</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
             <span style="color:var(--text-3);font-size:18px">›</span>
           </div>
         </div>
@@ -395,6 +407,7 @@ function connectSSE() {
   es.addEventListener('report_created', e => {
     S.reports.unshift(JSON.parse(e.data));
     if (S.tab === 'reports') renderReportList();
+    updateHomePage();
   });
 }
 
@@ -473,7 +486,8 @@ function renderOrderList() {
   updateHomePage();
   const labels = { pending:'待拣货', picking:'拣货中', done:'已完成' };
   const bc     = { pending:'b-pend', picking:'b-pick', done:'b-done' };
-  const html = S.orders.map(o => {
+  const activeOrders = S.orders.filter(o => orderStatus(o) !== 'done');
+  const html = activeOrders.map(o => {
     const p = progress(o), st = orderStatus(o), pct = Math.round(p.done / p.total * 100);
     return `<div class="card-row" onclick="openOrder('${o.id}')">
       <div style="flex:1;min-width:0">
@@ -489,7 +503,7 @@ function renderOrderList() {
     </div>`;
   }).join('');
   document.getElementById('orderListContent').innerHTML = `<div class="card">${html ||
-    '<div class="card-plain"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无订单</div><div class="empty-sub">请在管理页上传 Excel</div></div></div>'}</div>`;
+    '<div class="card-plain"><div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">暂无待处理订单</div><div class="empty-sub">所有订单均已完成</div></div></div>'}</div>`;
 }
 
 // ─── PICKING ──────────────────────────────────────────────
@@ -918,14 +932,24 @@ function goToOrders() {
   window.scrollTo(0, 0);
 }
 
+function goToReports() {
+  S.pageStack.push({ id: 'orders', title: '首页', sub: null });
+  showPage('reports', '拣货报告');
+  document.getElementById('backBtn').style.display = 'flex';
+  renderReportList();
+  window.scrollTo(0, 0);
+}
+
 function updateHomePage() {
-  const pending = S.orders.filter(o => orderStatus(o) !== 'done').length;
-  const total   = S.orders.length;
-  const badge   = document.getElementById('homeOrderBadge');
-  const sub     = document.getElementById('homeOrderSub');
-  const tabDot  = document.getElementById('tab-orders');
-  if (sub)   sub.textContent   = total ? `${total} 个订单 · ${pending} 待处理` : '暂无订单';
+  const pending  = S.orders.filter(o => orderStatus(o) !== 'done').length;
+  const active   = S.orders.filter(o => orderStatus(o) !== 'done').length;
+  const badge    = document.getElementById('homeOrderBadge');
+  const sub      = document.getElementById('homeOrderSub');
+  const rSub     = document.getElementById('homeReportSub');
+  const tabDot   = document.getElementById('tab-orders');
+  if (sub)   sub.textContent = active ? `${active} 个订单待处理` : '暂无待处理订单';
   if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? 'inline-flex' : 'none'; }
+  if (rSub)  rSub.textContent = S.reports.length ? `共 ${S.reports.length} 笔报告` : '暂无报告';
   if (tabDot) tabDot.classList.toggle('has-badge', pending > 0);
 }
 
