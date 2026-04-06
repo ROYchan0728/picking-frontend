@@ -216,8 +216,19 @@ input[type="file"]{display:none}
   <div class="page" id="page-stock">
     <div id="stock-group-view">
       <div class="section-header"><span class="section-title">库存</span></div>
-      <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品组别</div>
-      <div class="card" id="stockGroupList"></div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="stockGlobalSearch" placeholder="搜索所有商品名称或代码..." oninput="onStockGlobalSearch(this)">
+        <button class="search-clear" id="stockGlobalSearchClear" onclick="clearStockGlobalSearch()">✕</button>
+      </div>
+      <div class="search-meta" id="stockGlobalSearchMeta"></div>
+      <div id="stockGlobalResults" style="display:none">
+        <div class="card" id="stockGlobalList"></div>
+      </div>
+      <div id="stockGroupSection">
+        <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品组别</div>
+        <div id="stockGroupList"></div>
+      </div>
     </div>
     <div id="stock-items-view" style="display:none">
       <div class="search-wrap" style="margin-top:10px">
@@ -397,7 +408,11 @@ function switchMainTab(tab) {
   if (tab === 'orders')  { showPage('orders',  '待拣订单'); renderOrderList(); }
   if (tab === 'reports') { showPage('reports', '拣货报告'); renderReportList(); }
   if (tab === 'admin')   { showPage('admin',   '后台管理'); renderAdminList(); }
-  if (tab === 'stock')   { showPage('stock',   '库存'); loadStock().then(renderStockGroups); }
+  if (tab === 'stock')   {
+    showPage('stock', '库存');
+    clearStockGlobalSearch && document.getElementById('stockGlobalSearch') && (document.getElementById('stockGlobalSearch').value = '');
+    loadStock().then(renderStockGroups);
+  }
   window.scrollTo(0, 0);
 }
 
@@ -668,6 +683,13 @@ async function loadStock() {
 function renderStockGroups() {
   document.getElementById('stock-group-view').style.display = 'block';
   document.getElementById('stock-items-view').style.display = 'none';
+  // Reset global search state
+  const gsr = document.getElementById('stockGlobalResults');
+  const gss = document.getElementById('stockGroupSection');
+  const gsm = document.getElementById('stockGlobalSearchMeta');
+  if (gsr) gsr.style.display = 'none';
+  if (gss) gss.style.display = 'block';
+  if (gsm) gsm.textContent = '';
 
   if (!stockState.items.length) {
     document.getElementById('stockGroupList').innerHTML =
@@ -737,6 +759,56 @@ function renderStockItems() {
       </div>
     </div>`;
   }).join('') + '</div>';
+}
+
+function onStockGlobalSearch(input) {
+  const q = input.value.trim();
+  document.getElementById('stockGlobalSearchClear').style.display = q ? 'flex' : 'none';
+  if (!q) {
+    document.getElementById('stockGlobalResults').style.display = 'none';
+    document.getElementById('stockGroupSection').style.display = 'block';
+    document.getElementById('stockGlobalSearchMeta').textContent = '';
+    return;
+  }
+  const ql = q.toLowerCase();
+  const results = stockState.items.filter(i =>
+    i.name.toLowerCase().includes(ql) || i.code.toLowerCase().includes(ql)
+  );
+  document.getElementById('stockGroupSection').style.display = 'none';
+  document.getElementById('stockGlobalResults').style.display = 'block';
+  document.getElementById('stockGlobalSearchMeta').textContent = `找到 ${results.length} 个商品`;
+  if (!results.length) {
+    document.getElementById('stockGlobalList').innerHTML =
+      '<div class="card-plain" style="text-align:center;padding:24px;color:var(--text-2);font-size:14px">没有符合的商品</div>';
+    return;
+  }
+  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hlFn = text => String(text).replace(new RegExp('(' + esc + ')', 'gi'), '<span class="highlight">$1</span>');
+  document.getElementById('stockGlobalList').innerHTML = '<div class="card">' + results.map(item => {
+    const qtyColor = item.qty <= 0 ? 'var(--red)' : item.qty <= 10 ? 'var(--amber)' : 'var(--green)';
+    const qtyLabel = item.qty <= 0 ? '缺货' : item.qty <= 10 ? '库存偏低' : '库存充足';
+    return `<div style="padding:12px 16px;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:2px">${hlFn(item.code)}</div>
+          <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.35">${hlFn(item.name)}</div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:3px">${item.group} · UOM: ${item.uom}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:18px;font-weight:700;color:${qtyColor}">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}</div>
+          <div style="font-size:10px;color:${qtyColor};font-weight:500">${qtyLabel}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function clearStockGlobalSearch() {
+  document.getElementById('stockGlobalSearch').value = '';
+  document.getElementById('stockGlobalSearchClear').style.display = 'none';
+  document.getElementById('stockGlobalResults').style.display = 'none';
+  document.getElementById('stockGroupSection').style.display = 'block';
+  document.getElementById('stockGlobalSearchMeta').textContent = '';
 }
 
 function onStockSearch(input) {
