@@ -355,21 +355,48 @@ input[type="file"]{display:none}
   <div class="page" id="page-settings">
     <div class="section-header"><span class="section-title">设置</span></div>
     <div style="padding:0 16px">
-      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">通知</div>
-      <div class="card">
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">推送通知</div>
+      <div class="card" style="margin-bottom:10px">
         <div class="card-row" style="cursor:default">
           <div style="flex:1">
-            <div style="font-size:15px;font-weight:500;color:var(--text)">新订单推送通知</div>
+            <div style="font-size:15px;font-weight:500;color:var(--text)">新订单提醒</div>
             <div style="font-size:12px;color:var(--text-2);margin-top:2px">有新订单时锁屏推送提醒</div>
           </div>
-          <button id="pushPermBtn" class="btn btn-sm" onclick="requestPushPermission()">🔔 开启推送通知</button>
+          <button id="pushPermBtn" class="btn btn-sm" onclick="requestPushPermission()">🔔 开启通知</button>
         </div>
       </div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">库存更新提醒</div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-row" style="cursor:default">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">每日提醒</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">定时提醒上传最新库存 Excel</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0">
+            <input type="checkbox" id="reminderToggle" onchange="saveReminderSettings()" style="opacity:0;width:0;height:0;position:absolute">
+            <span id="reminderToggleTrack" style="position:absolute;inset:0;border-radius:13px;background:var(--border-md);transition:.2s;cursor:pointer"></span>
+            <span id="reminderToggleThumb" style="position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>
+          </label>
+        </div>
+        <div style="height:0.5px;background:var(--border)"></div>
+        <div class="card-row" style="cursor:default" id="reminderTimeRow">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">提醒时间</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">每天定时推送提醒</div>
+          </div>
+          <input type="time" id="reminderTime" value="08:45"
+            style="font-size:15px;font-weight:500;color:var(--text);border:none;background:transparent;text-align:right;outline:none;cursor:pointer"
+            onchange="saveReminderSettings()">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);padding:0 4px 4px">提醒时间为新加坡时间（SGT，UTC+8）</div>
 
       <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">关于</div>
       <div class="card">
         <div class="card-plain">
-          <div style="display:flex;align-items:center;gap:12px">
+          <div style="display:flex;align-items:center">
             <div style="font-size:13px;color:var(--text-2)">版本</div>
             <div style="font-size:13px;color:var(--text);margin-left:auto">1.0.0</div>
           </div>
@@ -561,7 +588,7 @@ function switchMainTab(tab) {
   if (tab === 'orders')  { showPage('orders', '首页'); updateHomePage(); }
   if (tab === 'reports') { showPage('reports', '拣货报告'); renderReportList(); }
   if (tab === 'admin')    { showPage('admin', '管理'); renderAdminList(); updateAdminStockInfo(); }
-  if (tab === 'settings') { showPage('settings', '设置'); updatePushBtn(); }
+  if (tab === 'settings') { showPage('settings', '设置'); renderSettingsPage(); }
   if (tab === 'stock')   {
     showPage('stock', '库存');
     clearStockGlobalSearch && document.getElementById('stockGlobalSearch') && (document.getElementById('stockGlobalSearch').value = '');
@@ -842,7 +869,7 @@ async function handleFileUpload(input) {
 // ─── INIT ─────────────────────────────────────────────────
 (async () => {
   try {
-    await Promise.all([loadAll(), loadStock()]);
+    await Promise.all([loadAll(), loadStock(), loadSettings()]);
     S.orders.forEach(o => S.knownOrderIds.add(o.id));
     updateHomePage();
   } catch (e) {
@@ -1243,6 +1270,62 @@ function goToAdminStock() {
   document.getElementById('backBtn').style.display = 'flex';
   updateAdminStockInfo();
   window.scrollTo(0, 0);
+}
+
+
+// ─── SETTINGS ─────────────────────────────────────────────
+let appSettings = { stockReminderTime: '08:45', stockReminderEnabled: true };
+
+async function loadSettings() {
+  try {
+    appSettings = await apiFetch('/api/settings');
+  } catch {}
+}
+
+function renderSettingsPage() {
+  const toggle = document.getElementById('reminderToggle');
+  const track  = document.getElementById('reminderToggleTrack');
+  const thumb  = document.getElementById('reminderToggleThumb');
+  const timeInput = document.getElementById('reminderTime');
+  const timeRow   = document.getElementById('reminderTimeRow');
+  if (!toggle) return;
+
+  toggle.checked = !!appSettings.stockReminderEnabled;
+  if (timeInput) timeInput.value = appSettings.stockReminderTime || '08:45';
+
+  // Toggle visual state
+  const on = toggle.checked;
+  if (track) track.style.background = on ? 'var(--green)' : 'var(--border-md)';
+  if (thumb) thumb.style.left = on ? '21px' : '3px';
+  if (timeRow) timeRow.style.opacity = on ? '1' : '0.4';
+
+  updatePushBtn();
+}
+
+async function saveReminderSettings() {
+  const toggle = document.getElementById('reminderToggle');
+  const timeInput = document.getElementById('reminderTime');
+  const on = toggle ? toggle.checked : appSettings.stockReminderEnabled;
+  const time = timeInput ? timeInput.value : appSettings.stockReminderTime;
+
+  // Update toggle visuals
+  const track = document.getElementById('reminderToggleTrack');
+  const thumb = document.getElementById('reminderToggleThumb');
+  const timeRow = document.getElementById('reminderTimeRow');
+  if (track) track.style.background = on ? 'var(--green)' : 'var(--border-md)';
+  if (thumb) thumb.style.left = on ? '21px' : '3px';
+  if (timeRow) timeRow.style.opacity = on ? '1' : '0.4';
+
+  appSettings.stockReminderEnabled = on;
+  appSettings.stockReminderTime = time;
+
+  try {
+    await apiFetch('/api/settings', {
+      method: 'POST',
+      body: JSON.stringify({ stockReminderEnabled: on, stockReminderTime: time })
+    });
+    showToast(on ? `✓ 将在每天 ${time} 提醒` : '✓ 已关闭提醒');
+  } catch { showToast('保存失败，请重试'); }
 }
 
 </script>
