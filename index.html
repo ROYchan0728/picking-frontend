@@ -591,14 +591,7 @@ function switchMainTab(tab) {
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   setTopbarMode(true);
-  if (tab === 'orders')  {
-    if (S.tab === 'orders' && S.pageStack.length === 0) {
-      // Already on home — tap again to refresh
-      triggerRefresh();
-      return;
-    }
-    showPage('orders', '首页'); updateHomePage();
-  }
+  if (tab === 'orders')  { showPage('orders', '首页'); updateHomePage(); }
   if (tab === 'reports') { showPage('reports', '拣货报告'); renderReportList(); }
   if (tab === 'admin')    { showPage('admin', '管理'); renderAdminList(); updateAdminStockInfo(); }
   if (tab === 'settings') { showPage('settings', '设置'); renderSettingsPage(); }
