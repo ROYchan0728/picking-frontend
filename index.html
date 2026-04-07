@@ -194,6 +194,244 @@ input[type="file"]{display:none}
   </div>
 </div>
 
+<!-- CONTENT -->
+<div class="content">
+
+  <div class="page active" id="page-orders">
+    <div class="section-header"><span class="section-title">首页</span></div>
+    <div style="padding:0 16px 16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">拣货</div>
+      <div class="card" onclick="goToOrders()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:var(--green-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📦</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">待拣订单</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="homeOrderSub">载入中...</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge b-out" id="homeOrderBadge" style="display:none"></span>
+            <span style="color:var(--text-3);font-size:18px">›</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" onclick="goToReports()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:#E6F1FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📋</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">拣货报告</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="homeReportSub">载入中...</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="color:var(--text-3);font-size:18px">›</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">其他功能</div>
+      <div style="color:var(--text-3);font-size:13px;padding:12px 4px">更多功能即将推出</div>
+    </div>
+  </div>
+
+  <div class="page" id="page-order-list">
+    <div class="section-header">
+      <span class="section-title">待拣订单</span>
+      <span class="badge b-pend" id="orderCountBadge"></span>
+    </div>
+    <div id="orderListContent"></div>
+  </div>
+
+  <div class="page" id="page-picking">
+    <div class="stats-grid" id="pickStats"></div>
+    <div class="pick-list" id="pickItems"></div>
+    <div class="finish-area">
+      <button class="btn btn-primary btn-full" onclick="finishPicking()">完成拣货，生成报告</button>
+    </div>
+  </div>
+
+  <div class="page" id="page-reports">
+    <div class="section-header"><span class="section-title">拣货报告</span></div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="reportSearch" placeholder="搜索订单号或品项..." oninput="onSearch(this)">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()">✕</button>
+    </div>
+    <div class="search-meta" id="searchMeta"></div>
+    <div class="card" id="reportListCard"></div>
+  </div>
+
+  <div class="page" id="page-report-detail">
+    <div class="stats-grid" id="detailStats"></div>
+    <div id="detailContent"></div>
+  </div>
+
+  <div class="page" id="page-stock">
+    <div id="stock-group-view">
+      <div class="section-header"><span class="section-title">库存</span></div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="stockGlobalSearch" placeholder="搜索所有商品名称或代码..." oninput="onStockGlobalSearch(this)">
+        <button class="search-clear" id="stockGlobalSearchClear" onclick="clearStockGlobalSearch()">✕</button>
+      </div>
+      <div class="search-meta" id="stockGlobalSearchMeta"></div>
+      <div id="stockGlobalResults" style="display:none">
+        <div class="card" id="stockGlobalList"></div>
+      </div>
+      <div id="stockGroupSection">
+        <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">选择商品组别</div>
+        <div id="stockGroupList"></div>
+      </div>
+    </div>
+    <div id="stock-items-view" style="display:none">
+      <div class="search-wrap" style="margin-top:10px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="stockSearch" placeholder="搜索商品名称或代码..." oninput="onStockSearch(this)">
+        <button class="search-clear" id="stockSearchClear" onclick="clearStockSearch()">✕</button>
+      </div>
+      <div class="search-meta" id="stockSearchMeta"></div>
+      <div id="stockItemsList"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin">
+    <div class="section-header"><span class="section-title">管理</span></div>
+    <div style="padding:0 16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">功能入口</div>
+      <div class="card" onclick="goToAdminOrders()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:var(--green-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📂</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">订单管理</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="adminOrderMenuSub">上传及管理拣货订单</div>
+          </div>
+          <span style="color:var(--text-3);font-size:18px">›</span>
+        </div>
+      </div>
+      <div class="card" onclick="goToAdminStock()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:#E6F1FB;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">📊</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">库存管理</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="adminStockMenuSub">上传及更新库存数据</div>
+          </div>
+          <span style="color:var(--text-3);font-size:18px">›</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-orders">
+    <div style="padding:0 16px">
+      <p style="font-size:13px;color:var(--text-2);padding:12px 0">上传 Excel 文件，文件名自动成为订单号</p>
+      <label for="fileInput">
+        <div class="upload-zone">
+          <div class="upload-zone-icon">📂</div>
+          <div class="upload-zone-text">点击上传订单 Excel</div>
+          <div class="upload-zone-sub">.xlsx 格式 · 含 Numbering, Description, Qty, User UOM 列</div>
+        </div>
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileUpload(this)">
+      <div style="padding:12px 0 8px;font-size:13px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">已载入订单</div>
+      <div class="card" id="adminOrderList"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-stock">
+    <div style="padding:0 16px">
+      <p style="font-size:13px;color:var(--text-2);padding:12px 0">上传最新库存 Excel，自动替换现有数据</p>
+      <label for="stockFileInput">
+        <div class="upload-zone">
+          <div class="upload-zone-icon">📊</div>
+          <div class="upload-zone-text">点击上传库存 Excel</div>
+          <div class="upload-zone-sub">.xlsx 格式 · 含商品代码、名称、基本UOM、剩余总量等列</div>
+        </div>
+      </label>
+      <input type="file" id="stockFileInput" accept=".xlsx,.xls" onchange="handleStockUpload(this)">
+      <div class="card" id="adminStockInfo" style="margin-top:10px;display:none">
+        <div class="card-plain" id="adminStockInfoContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-settings">
+    <div class="section-header"><span class="section-title">设置</span></div>
+    <div style="padding:0 16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">推送通知</div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-row" style="cursor:default">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">新订单提醒</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">有新订单时锁屏推送提醒</div>
+          </div>
+          <button id="pushPermBtn" class="btn btn-sm" onclick="requestPushPermission()">🔔 开启通知</button>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">库存更新提醒</div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-row" style="cursor:default">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">每日提醒</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">定时提醒上传最新库存 Excel</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:26px;flex-shrink:0">
+            <input type="checkbox" id="reminderToggle" onchange="saveReminderSettings()" style="opacity:0;width:0;height:0;position:absolute">
+            <span id="reminderToggleTrack" style="position:absolute;inset:0;border-radius:13px;background:var(--border-md);transition:.2s;cursor:pointer"></span>
+            <span id="reminderToggleThumb" style="position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>
+          </label>
+        </div>
+        <div style="height:0.5px;background:var(--border)"></div>
+        <div class="card-row" style="cursor:default" id="reminderTimeRow">
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">提醒时间</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">每天定时推送提醒</div>
+          </div>
+          <input type="time" id="reminderTime" value="08:45"
+            style="font-size:15px;font-weight:500;color:var(--text);border:none;background:transparent;text-align:right;outline:none;cursor:pointer"
+            onchange="saveReminderSettings()">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);padding:0 4px 4px">提醒时间为新加坡时间（SGT，UTC+8）</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">关于</div>
+      <div class="card">
+        <div class="card-plain">
+          <div style="display:flex;align-items:center">
+            <div style="font-size:13px;color:var(--text-2)">版本</div>
+            <div style="font-size:13px;color:var(--text);margin-left:auto">1.0.0</div>
+          </div>
+        </div>
+        <div style="height:0.5px;background:var(--border)"></div>
+        <div class="card-plain">
+          <div style="font-size:13px;color:var(--text-2)">GOLDEN HARVEST 拣货管理系统</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TAB BAR -->
+<div class="tabbar">
+  <button class="tab-item active" id="tab-orders" onclick="switchMainTab('orders')">
+    <span class="tab-icon">🏠</span>
+    <span class="tab-label">首页</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-admin" onclick="switchMainTab('admin')">
+    <span class="tab-icon">🗂️</span>
+    <span class="tab-label">管理</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-stock" onclick="switchMainTab('stock')">
+    <span class="tab-icon">🗄️</span>
+    <span class="tab-label">库存</span>
+    <span class="tab-dot"></span>
+  </button>
+  <button class="tab-item" id="tab-settings" onclick="switchMainTab('settings')">
+    <span class="tab-icon">⚙️</span>
+    <span class="tab-label">设置</span>
+    <span class="tab-dot"></span>
+  </button>
+</div>
+
+
 <div class="toast" id="toast"></div>
 <div class="notif-banner" id="notifBanner" onclick="notifTapped()">
   <div class="notif-inner">
