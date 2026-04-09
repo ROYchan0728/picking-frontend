@@ -235,7 +235,16 @@ input[type="file"]{display:none}
         </div>
       </div>
       <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;margin-top:20px">其他功能</div>
-      <div style="color:var(--text-3);font-size:13px;padding:12px 4px">更多功能即将推出</div>
+      <div class="card" onclick="goToVendorPO()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:#FAEEDA;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">🚢</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">供货商 PO</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="homeVendorPOSub">查看各船供货商采购单</div>
+          </div>
+          <span style="color:var(--text-3);font-size:18px">›</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -299,6 +308,24 @@ input[type="file"]{display:none}
     </div>
   </div>
 
+
+  <!-- Vendor PO: vessel list -->
+  <div class="page" id="page-vendor-po">
+    <div class="section-header"><span class="section-title">供货商 PO</span></div>
+    <div style="padding:0 16px 8px;font-size:13px;color:var(--text-2)">按船名选择</div>
+    <div id="vendorVesselList"></div>
+  </div>
+
+  <!-- Vendor PO: vendor list under a vessel -->
+  <div class="page" id="page-vendor-list">
+    <div id="vendorListContent"></div>
+  </div>
+
+  <!-- Vendor PO: PO detail -->
+  <div class="page" id="page-vendor-detail">
+    <div id="vendorDetailContent"></div>
+  </div>
+
   <div class="page" id="page-admin">
     <div class="section-header"><span class="section-title">管理</span></div>
     <div style="padding:0 16px">
@@ -309,6 +336,16 @@ input[type="file"]{display:none}
           <div style="flex:1;min-width:0">
             <div style="font-size:15px;font-weight:500;color:var(--text)">订单管理</div>
             <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="adminOrderMenuSub">上传及管理拣货订单</div>
+          </div>
+          <span style="color:var(--text-3);font-size:18px">›</span>
+        </div>
+      </div>
+      <div class="card" onclick="goToAdminVendorPO()" style="cursor:pointer;margin-bottom:8px">
+        <div class="card-row" style="gap:14px">
+          <div style="width:44px;height:44px;border-radius:var(--radius);background:#FAEEDA;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px">🚢</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500;color:var(--text)">供货商 PO 管理</div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px" id="adminVendorPOMenuSub">上传及管理供货商 PDF</div>
           </div>
           <span style="color:var(--text-3);font-size:18px">›</span>
         </div>
@@ -339,6 +376,47 @@ input[type="file"]{display:none}
       <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileUpload(this)">
       <div style="padding:12px 0 8px;font-size:13px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">已载入订单</div>
       <div class="card" id="adminOrderList"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-vendor-po">
+    <div style="padding:0 16px">
+      <p style="font-size:13px;color:var(--text-2);padding:12px 0">上传 PDF 采购单，系统自动按船名和供货商分类</p>
+      <div id="vendorPoUploadForm">
+        <div style="margin-bottom:10px">
+          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">PO 编号</label>
+          <input type="text" id="vpoPO" placeholder="例：PO-100768" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">船名 (Vessel Name)</label>
+          <input type="text" id="vpoVessel" placeholder="例：NEW LEADER" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">供货商名称</label>
+          <input type="text" id="vpoVendor" placeholder="例：SEA CONTRACTOR (S) PTE LTD" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">交货日期</label>
+            <input type="text" id="vpoDelivery" placeholder="13/04/2026" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
+          </div>
+          <div>
+            <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">采购员</label>
+            <input type="text" id="vpoPurchaser" placeholder="JASON" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
+          </div>
+        </div>
+        <label for="vpoPDF">
+          <div class="upload-zone" id="vpoPDFZone">
+            <div class="upload-zone-icon">📄</div>
+            <div class="upload-zone-text" id="vpoPDFText">点击选择 PDF 文件</div>
+            <div class="upload-zone-sub">选择后填写上方信息再提交</div>
+          </div>
+        </label>
+        <input type="file" id="vpoPDF" accept=".pdf" onchange="onVPOPDFSelect(this)">
+        <button class="btn btn-primary btn-full" style="margin-top:12px" onclick="uploadVendorPO()">提交上传</button>
+      </div>
+      <div style="padding:16px 0 8px;font-size:13px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">已上传 PO</div>
+      <div class="card" id="adminVendorPOList"></div>
     </div>
   </div>
 
@@ -524,6 +602,13 @@ function connectSSE() {
     if (idx >= 0) order.items[idx] = item;
     if (currentPageId() === 'picking' && S.currentOrder === orderId) renderPicking();
     if (S.tab === 'orders') renderOrderList();
+  });
+
+  es.addEventListener('vendor_pos_updated', e => {
+    vendorPOs = JSON.parse(e.data);
+    updateHomeVendorPOSub();
+    if (currentPageId() === 'vendor-po') renderVesselList();
+    if (currentPageId() === 'admin-vendor-po') renderAdminVendorPOList();
   });
 
   es.addEventListener('stock_updated', e => {
@@ -875,7 +960,7 @@ async function handleFileUpload(input) {
 // ─── INIT ─────────────────────────────────────────────────
 (async () => {
   try {
-    await Promise.all([loadAll(), loadStock(), loadSettings()]);
+    await Promise.all([loadAll(), loadStock(), loadSettings(), loadVendorPOs()]);
     S.orders.forEach(o => S.knownOrderIds.add(o.id));
     updateHomePage();
   } catch (e) {
@@ -889,7 +974,7 @@ async function handleFileUpload(input) {
   // ── Refresh when app comes back to foreground ──
   async function refreshAll() {
     try {
-      await Promise.all([loadAll(), loadStock()]);
+      await Promise.all([loadAll(), loadStock(), loadVendorPOs()]);
       updateHomePage();
       const pg = currentPageId();
       if (pg === 'order-list') renderOrderList();
@@ -1398,6 +1483,203 @@ async function triggerRefresh() {
 function hidePTR() {
   const ind = document.getElementById('ptrIndicator');
   if (ind) ind.classList.remove('visible');
+}
+
+
+// ─── VENDOR PO ────────────────────────────────────────────
+let vendorPOs = [];
+let _vpoPDFFile = null;
+
+async function loadVendorPOs() {
+  try {
+    const data = await apiFetch('/api/vendor-pos');
+    vendorPOs = data.map(p => ({ ...p }));
+    updateHomeVendorPOSub();
+  } catch { vendorPOs = []; }
+}
+
+function updateHomeVendorPOSub() {
+  const sub = document.getElementById('homeVendorPOSub');
+  const menuSub = document.getElementById('adminVendorPOMenuSub');
+  const vessels = [...new Set(vendorPOs.map(p => p.vessel))];
+  if (sub) sub.textContent = vendorPOs.length ? `${vendorPOs.length} 份 PO · ${vessels.length} 艘船` : '查看各船供货商采购单';
+  if (menuSub) menuSub.textContent = vendorPOs.length ? `${vendorPOs.length} 份 PO 已上传` : '上传及管理供货商 PDF';
+}
+
+function goToVendorPO() {
+  S.pageStack.push({ id: 'orders', title: '首页', sub: null });
+  showPage('vendor-po', '供货商 PO');
+  document.getElementById('backBtn').style.display = 'flex';
+  setTopbarMode(false);
+  renderVesselList();
+  window.scrollTo(0, 0);
+}
+
+function renderVesselList() {
+  const vessels = {};
+  vendorPOs.forEach(p => {
+    if (!vessels[p.vessel]) vessels[p.vessel] = [];
+    vessels[p.vessel].push(p);
+  });
+  const el = document.getElementById('vendorVesselList');
+  if (!el) return;
+  if (!Object.keys(vessels).length) {
+    el.innerHTML = '<div class="card"><div class="card-plain"><div class="empty-state"><div class="empty-icon">🚢</div><div class="empty-text">暂无 PO</div><div class="empty-sub">请在管理页上传供货商 PDF</div></div></div></div>';
+    return;
+  }
+  el.innerHTML = '<div class="card">' + Object.entries(vessels).map(([vessel, pos]) => `
+    <div class="card-row" onclick="openVesselPOs('${encodeURIComponent(vessel)}')">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:500;color:var(--text)">${vessel}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${pos.length} 个供货商</div>
+      </div>
+      <span style="color:var(--text-3);font-size:18px">›</span>
+    </div>`).join('') + '</div>';
+}
+
+function openVesselPOs(encodedVessel) {
+  const vessel = decodeURIComponent(encodedVessel);
+  const pos = vendorPOs.filter(p => p.vessel === vessel);
+  S.pageStack.push({ id: 'vendor-po', title: '供货商 PO', sub: null });
+  showPage('vendor-list', vessel);
+  document.getElementById('backBtn').style.display = 'flex';
+  setTopbarMode(false);
+  document.getElementById('vendorListContent').innerHTML =
+    '<div style="padding:0 16px 8px;font-size:13px;color:var(--text-2);margin-top:12px">选择供货商</div>' +
+    '<div class="card">' + pos.map(p => `
+      <div class="card-row" onclick="openVendorPODetail('${p.po}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;color:var(--text)">${p.vendor}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.po} · 交货：${p.delivery}</div>
+        </div>
+        <span style="color:var(--text-3);font-size:18px">›</span>
+      </div>`).join('') + '</div>';
+  window.scrollTo(0, 0);
+}
+
+function openVendorPODetail(po) {
+  const p = vendorPOs.find(x => x.po === po);
+  if (!p) return;
+  S.pageStack.push({ id: 'vendor-list', title: document.getElementById('topbarTitle').textContent, sub: null });
+  showPage('vendor-detail', p.po);
+  document.getElementById('backBtn').style.display = 'flex';
+  setTopbarMode(false);
+  // Add view PDF button in topbar
+  document.getElementById('topbarRight').innerHTML = `<button class="btn btn-sm btn-primary" onclick="viewPDF('${po}')">查看 PDF</button>`;
+
+  const rows = p.items.map(i => `
+    <div class="r-item-row">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--text-2);margin-bottom:2px">S/N ${i.sn}  IMPA ${i.impa}</div>
+        <div style="font-size:14px;font-weight:500;color:var(--text)">${i.desc}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${i.qty} ${i.uom}</div>
+        <div style="font-size:11px;color:var(--text-2)">S$${i.uprice.toFixed(2)}</div>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('vendorDetailContent').innerHTML = `
+    <div style="padding:12px 16px 0">
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-plain">
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:8px">供货商</div>
+          <div style="font-size:15px;font-weight:500;color:var(--text)">${p.vendor}</div>
+        </div>
+        <div style="height:0.5px;background:var(--border)"></div>
+        <div class="card-plain" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:11px;color:var(--text-2)">交货日期</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:3px">${p.delivery}</div></div>
+          <div><div style="font-size:11px;color:var(--text-2)">采购员</div><div style="font-size:13px;font-weight:500;color:var(--text);margin-top:3px">${p.purchaser}</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="r-section-title">品项明细</div>
+    <div class="card" style="margin-bottom:4px">${rows}</div>
+    <div style="padding:12px 16px">
+      <div class="card">
+        <div class="card-plain">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2)"><span>Sub Total</span><span>S$${p.subtotal.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);margin-top:4px"><span>GST 9%</span><span>S$${p.gst.toFixed(2)}</span></div>
+          <div style="height:0.5px;background:var(--border);margin:8px 0"></div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;color:var(--text)"><span>Total</span><span>S$${p.total.toFixed(2)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  window.scrollTo(0, 0);
+}
+
+function viewPDF(po) {
+  const url = API + '/api/vendor-pos/' + po + '/pdf';
+  window.open(url, '_blank');
+}
+
+// ── Admin vendor PO ──
+function goToAdminVendorPO() {
+  S.pageStack.push({ id: 'admin', title: '管理', sub: null });
+  showPage('admin-vendor-po', '供货商 PO 管理');
+  document.getElementById('backBtn').style.display = 'flex';
+  setTopbarMode(false);
+  renderAdminVendorPOList();
+  window.scrollTo(0, 0);
+}
+
+function onVPOPDFSelect(input) {
+  _vpoPDFFile = input.files[0];
+  const txt = document.getElementById('vpoPDFText');
+  if (txt && _vpoPDFFile) txt.textContent = _vpoPDFFile.name;
+}
+
+async function uploadVendorPO() {
+  const po        = document.getElementById('vpoPO').value.trim();
+  const vessel    = document.getElementById('vpoVessel').value.trim();
+  const vendor    = document.getElementById('vpoVendor').value.trim();
+  const delivery  = document.getElementById('vpoDelivery').value.trim();
+  const purchaser = document.getElementById('vpoPurchaser').value.trim();
+  if (!po || !vessel || !vendor) { showToast('请填写 PO 编号、船名和供货商'); return; }
+  if (!_vpoPDFFile)              { showToast('请选择 PDF 文件'); return; }
+
+  const fd = new FormData();
+  fd.append('file', _vpoPDFFile);
+  fd.append('po', po); fd.append('vessel', vessel); fd.append('vendor', vendor);
+  fd.append('delivery', delivery); fd.append('purchaser', purchaser);
+  fd.append('items', '[]');
+  fd.append('subtotal', '0'); fd.append('gst', '0'); fd.append('total', '0');
+
+  try {
+    await fetch(API + '/api/vendor-pos/upload', { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
+    await loadVendorPOs();
+    renderAdminVendorPOList();
+    showToast('✓ ' + po + ' 已上传');
+    // Reset form
+    ['vpoPO','vpoVessel','vpoVendor','vpoDelivery','vpoPurchaser'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+    _vpoPDFFile = null;
+    const txt = document.getElementById('vpoPDFText');
+    if (txt) txt.textContent = '点击选择 PDF 文件';
+  } catch { showToast('上传失败，请重试'); }
+}
+
+function renderAdminVendorPOList() {
+  const el = document.getElementById('adminVendorPOList');
+  if (!el) return;
+  if (!vendorPOs.length) { el.innerHTML = '<div class="card-plain" style="text-align:center;padding:20px;color:var(--text-2);font-size:13px">暂无 PO</div>'; return; }
+  el.innerHTML = vendorPOs.map(p => `
+    <div class="card-row" style="cursor:default">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500;color:var(--text)">${p.po}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.vessel} · ${p.vendor}</div>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="deleteVendorPO('${p.po}')">删除</button>
+    </div>`).join('');
+}
+
+async function deleteVendorPO(po) {
+  if (!confirm('确认删除 ' + po + '？')) return;
+  try {
+    await apiFetch('/api/vendor-pos/' + po, { method: 'DELETE' });
+    await loadVendorPOs();
+    renderAdminVendorPOList();
+    showToast('✓ 已删除');
+  } catch { showToast('删除失败'); }
 }
 
 </script>
