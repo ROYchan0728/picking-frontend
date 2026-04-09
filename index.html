@@ -516,6 +516,7 @@ const API = window.BACKEND_URL || '';
 // ─── STATE ───────────────────────────────────────────────
 const S = {
   knownOrderIds: new Set(),
+  knownPOIds: new Set(),
   tab: 'orders',
   pageStack: [],
   currentOrder: null,
@@ -583,10 +584,14 @@ function connectSSE() {
   });
 
   es.addEventListener('vendor_pos_updated', e => {
-    vendorPOs = JSON.parse(e.data);
+    const newPOs = JSON.parse(e.data);
+    const added = newPOs.filter(p => !S.knownPOIds.has(p.po));
+    vendorPOs = newPOs;
+    vendorPOs.forEach(p => S.knownPOIds.add(p.po));
     updateHomeVendorPOSub();
     if (currentPageId() === 'vendor-po') renderVesselList();
     if (currentPageId() === 'admin-vendor-po') renderAdminVendorPOList();
+    if (added.length > 0) showVendorPONotif(added);
   });
 
   es.addEventListener('stock_updated', e => {
@@ -940,6 +945,7 @@ async function handleFileUpload(input) {
   try {
     await Promise.all([loadAll(), loadStock(), loadSettings(), loadVendorPOs()]);
     S.orders.forEach(o => S.knownOrderIds.add(o.id));
+    vendorPOs.forEach(p => S.knownPOIds.add(p.po));
     updateHomePage();
   } catch (e) {
     document.getElementById('loading').innerHTML = '<div style="text-align:center;padding:32px;color:#A32D2D"><div style="font-size:32px;margin-bottom:12px">⚠️</div><div style="font-size:15px;font-weight:500">无法连接服务器</div><div style="font-size:13px;color:#6b6b67;margin-top:6px">请检查网络或联系管理员</div></div>';
@@ -1210,6 +1216,34 @@ function updateHomePage() {
 // ─── NOTIFICATIONS ───────────────────────────────────────
 let _notifTimer = null;
 let _notifOrderId = null;
+
+function showVendorPONotif(added) {
+  const vessels = [...new Set(added.map(p => p.vessel))];
+  const vendors = [...new Set(added.map(p => p.vendor))];
+  const existingVessels = [...new Set(vendorPOs.filter(p => !added.find(a => a.po === p.po)).map(p => p.vessel))];
+
+  let title, sub;
+  const newVessels = vessels.filter(v => !existingVessels.includes(v));
+
+  if (newVessels.length > 0) {
+    title = `🚢 新船：${newVessels.join(', ')}`;
+    sub   = `${added.length} 份供货商 PO 已上传`;
+  } else if (vendors.length === 1) {
+    title = `📄 新供货商 PO`;
+    sub   = `${vendors[0]} · ${vessels[0]}`;
+  } else {
+    title = `📄 ${added.length} 份新供货商 PO`;
+    sub   = vessels.join(', ');
+  }
+
+  document.getElementById('notifTitle').textContent = title;
+  document.getElementById('notifSub').textContent   = sub;
+  document.getElementById('notifBanner').onclick = () => { dismissNotif(); goToVendorPO(); };
+  const banner = document.getElementById('notifBanner');
+  banner.classList.add('show');
+  if (_notifTimer) clearTimeout(_notifTimer);
+  _notifTimer = setTimeout(dismissNotif, 8000);
+}
 
 function showOrderNotif(addedOrders) {
   const count = addedOrders.length;
