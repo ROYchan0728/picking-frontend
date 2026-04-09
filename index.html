@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="拣货系统">
@@ -1568,24 +1568,36 @@ async function openVendorPODetail(po) {
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     el.innerHTML = '';
 
-    // Render all pages
+    // Render all pages at high resolution
+    // Use devicePixelRatio * extra multiplier for crisp text on retina/high-DPI screens
+    const dpr = window.devicePixelRatio || 2;
+    const RENDER_SCALE = dpr * 2; // render at 2x the device resolution for sharpness
+
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: window.devicePixelRatio || 1 });
+
+      // Base viewport at scale=1
+      const baseViewport = page.getViewport({ scale: 1 });
       const displayW = el.clientWidth || window.innerWidth;
-      const scale = displayW / viewport.width;
-      const scaledViewport = page.getViewport({ scale });
+
+      // Scale to fill display width, then multiply by render scale for sharpness
+      const fitScale = displayW / baseViewport.width;
+      const renderScale = fitScale * RENDER_SCALE;
+      const renderViewport = page.getViewport({ scale: renderScale });
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width  = scaledViewport.width;
-      canvas.height = scaledViewport.height;
+      // Canvas pixel size = high resolution
+      canvas.width  = renderViewport.width;
+      canvas.height = renderViewport.height;
+      // Display size = normal (CSS scales it down to fit)
       canvas.style.width  = '100%';
+      canvas.style.height = 'auto';
       canvas.style.display = 'block';
-      canvas.style.marginBottom = '4px';
+      canvas.style.marginBottom = '2px';
       el.appendChild(canvas);
 
-      await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+      await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
     }
 
     // Enable pinch-to-zoom via CSS transform
