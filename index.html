@@ -383,37 +383,15 @@ input[type="file"]{display:none}
     <div style="padding:0 16px">
       <p style="font-size:13px;color:var(--text-2);padding:12px 0">上传 PDF 采购单，系统自动按船名和供货商分类</p>
       <div id="vendorPoUploadForm">
-        <div style="margin-bottom:10px">
-          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">PO 编号</label>
-          <input type="text" id="vpoPO" placeholder="例：PO-100768" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
-        </div>
-        <div style="margin-bottom:10px">
-          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">船名 (Vessel Name)</label>
-          <input type="text" id="vpoVessel" placeholder="例：NEW LEADER" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
-        </div>
-        <div style="margin-bottom:10px">
-          <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">供货商名称</label>
-          <input type="text" id="vpoVendor" placeholder="例：SEA CONTRACTOR (S) PTE LTD" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div>
-            <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">交货日期</label>
-            <input type="text" id="vpoDelivery" placeholder="13/04/2026" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
-          </div>
-          <div>
-            <label style="font-size:13px;color:var(--text-2);display:block;margin-bottom:4px">采购员</label>
-            <input type="text" id="vpoPurchaser" placeholder="JASON" style="width:100%;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text)">
-          </div>
-        </div>
         <label for="vpoPDF">
           <div class="upload-zone" id="vpoPDFZone">
             <div class="upload-zone-icon">📄</div>
-            <div class="upload-zone-text" id="vpoPDFText">点击选择 PDF 文件</div>
-            <div class="upload-zone-sub">选择后填写上方信息再提交</div>
+            <div class="upload-zone-text" id="vpoPDFText">点击上传 PO PDF 文件</div>
+            <div class="upload-zone-sub">系统自动识别船名和供货商 · 支持批量上传</div>
           </div>
         </label>
-        <input type="file" id="vpoPDF" accept=".pdf" onchange="onVPOPDFSelect(this)">
-        <button class="btn btn-primary btn-full" style="margin-top:12px" onclick="uploadVendorPO()">提交上传</button>
+        <input type="file" id="vpoPDF" accept=".pdf" multiple onchange="uploadVendorPO(this)">
+        <div id="vpoUploadStatus" style="margin-top:10px"></div>
       </div>
       <div style="padding:16px 0 8px;font-size:13px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em">已上传 PO</div>
       <div class="card" id="adminVendorPOList"></div>
@@ -1623,39 +1601,43 @@ function goToAdminVendorPO() {
   window.scrollTo(0, 0);
 }
 
-function onVPOPDFSelect(input) {
-  _vpoPDFFile = input.files[0];
-  const txt = document.getElementById('vpoPDFText');
-  if (txt && _vpoPDFFile) txt.textContent = _vpoPDFFile.name;
-}
+async function uploadVendorPO(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const statusEl = document.getElementById('vpoUploadStatus');
+  const results = [];
 
-async function uploadVendorPO() {
-  const po        = document.getElementById('vpoPO').value.trim();
-  const vessel    = document.getElementById('vpoVessel').value.trim();
-  const vendor    = document.getElementById('vpoVendor').value.trim();
-  const delivery  = document.getElementById('vpoDelivery').value.trim();
-  const purchaser = document.getElementById('vpoPurchaser').value.trim();
-  if (!po || !vessel || !vendor) { showToast('请填写 PO 编号、船名和供货商'); return; }
-  if (!_vpoPDFFile)              { showToast('请选择 PDF 文件'); return; }
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const result = await fetch(API + '/api/vendor-pos/upload', { method: 'POST', body: fd }).then(r => r.json());
+      if (result.ok) {
+        results.push({ name: file.name, ok: true, po: result.po, vessel: result.vessel, vendor: result.vendor });
+      } else {
+        results.push({ name: file.name, ok: false, error: result.error });
+      }
+    } catch {
+      results.push({ name: file.name, ok: false, error: '上传失败' });
+    }
+  }
 
-  const fd = new FormData();
-  fd.append('file', _vpoPDFFile);
-  fd.append('po', po); fd.append('vessel', vessel); fd.append('vendor', vendor);
-  fd.append('delivery', delivery); fd.append('purchaser', purchaser);
-  fd.append('items', '[]');
-  fd.append('subtotal', '0'); fd.append('gst', '0'); fd.append('total', '0');
+  await loadVendorPOs();
+  renderAdminVendorPOList();
+  updateHomeVendorPOSub();
 
-  try {
-    await fetch(API + '/api/vendor-pos/upload', { method: 'POST', body: fd }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
-    await loadVendorPOs();
-    renderAdminVendorPOList();
-    showToast('✓ ' + po + ' 已上传');
-    // Reset form
-    ['vpoPO','vpoVessel','vpoVendor','vpoDelivery','vpoPurchaser'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-    _vpoPDFFile = null;
-    const txt = document.getElementById('vpoPDFText');
-    if (txt) txt.textContent = '点击选择 PDF 文件';
-  } catch { showToast('上传失败，请重试'); }
+  // Show results
+  if (statusEl) {
+    statusEl.innerHTML = '<div class="card">' + results.map(r => `
+      <div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:16px;flex-shrink:0">${r.ok ? '✅' : '❌'}</span>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${r.ok ? r.po : r.name}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.ok ? r.vessel + ' · ' + r.vendor : r.error}</div>
+        </div>
+      </div>`).join('') + '</div>';
+  }
+  input.value = '';
 }
 
 function renderAdminVendorPOList() {
