@@ -1745,14 +1745,21 @@ function renderAdminVendorPOList() {
   const el = document.getElementById('adminVendorPOList');
   if (!el) return;
   if (!vendorPOs.length) { el.innerHTML = '<div class="card-plain" style="text-align:center;padding:20px;color:var(--text-2);font-size:13px">暂无 PO</div>'; return; }
-  el.innerHTML = vendorPOs.map(p => `
-    <div class="card-row" style="cursor:default">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:500;color:var(--text)">${p.po}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.vessel} · ${p.vendor}</div>
-      </div>
-      <button class="btn btn-sm btn-danger" onclick="deleteVendorPO('${p.po}')">删除</button>
-    </div>`).join('');
+
+  // Group by vessel
+  const byVessel = {};
+  vendorPOs.forEach(p => { if (!byVessel[p.vessel]) byVessel[p.vessel] = []; byVessel[p.vessel].push(p); });
+
+  el.innerHTML = Object.entries(byVessel).map(([vessel, pos]) => `
+    <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;padding:14px 0 6px">${vessel}</div>
+    <div class="card">${pos.map(p => `
+      <div class="card-row" style="cursor:default">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;color:var(--text)">${p.po}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.vendor}</div>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="deleteVendorPO('${p.po}')">删除</button>
+      </div>`).join('')}</div>`).join('');
 }
 
 async function deleteVendorPO(po) {
