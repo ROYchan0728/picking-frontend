@@ -1539,14 +1539,16 @@ function renderVesselList() {
     el.innerHTML = '<div class="card"><div class="card-plain"><div class="empty-state"><div class="empty-icon">🚢</div><div class="empty-text">暂无 PO</div><div class="empty-sub">请在管理页上传供货商 PDF</div></div></div></div>';
     return;
   }
-  el.innerHTML = '<div class="card">' + Object.entries(vessels).map(([vessel, pos]) => `
-    <div class="card-row" onclick="openVesselPOs('${encodeURIComponent(vessel)}')">
+  el.innerHTML = '<div class="card">' + Object.entries(vessels).map(([vessel, pos]) => {
+    const latest = pos.reduce((a, b) => (a.uploadedAt > b.uploadedAt ? a : b), pos[0]);
+    return `<div class="card-row" onclick="openVesselPOs('${encodeURIComponent(vessel)}')">
       <div style="flex:1">
         <div style="font-size:15px;font-weight:500;color:var(--text)">${vessel}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${pos.length} 个供货商</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${pos.length} 个供货商 · 上传：${latest.uploadedAt || ''}</div>
       </div>
       <span style="color:var(--text-3);font-size:18px">›</span>
-    </div>`).join('') + '</div>';
+    </div>`;
+  }).join('') + '</div>';
 }
 
 function openVesselPOs(encodedVessel) {
@@ -1562,7 +1564,7 @@ function openVesselPOs(encodedVessel) {
       <div class="card-row" onclick="openVendorPODetail('${p.po}')">
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:500;color:var(--text)">${p.vendor}</div>
-          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.po} · 交货：${p.delivery}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.po}${p.delivery ? ' · 交货：' + p.delivery : ''}</div>
         </div>
         <span style="color:var(--text-3);font-size:18px">›</span>
       </div>`).join('') + '</div>';
@@ -1602,12 +1604,14 @@ async function openVendorPODetail(po) {
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     el.innerHTML = '';
 
-    // Render all pages at high resolution
-    // Use devicePixelRatio * extra multiplier for crisp text on retina/high-DPI screens
+    // Render the correct page — for multi-page PDFs, pageIndex tells us which page
     const dpr = window.devicePixelRatio || 2;
-    const RENDER_SCALE = dpr * 2; // render at 2x the device resolution for sharpness
+    const RENDER_SCALE = dpr * 2;
+    const targetPage = (p.pageIndex !== undefined ? p.pageIndex : 0) + 1;
+    const startPage  = targetPage;
+    const endPage    = targetPage; // only render the one page belonging to this PO
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    for (let pageNum = startPage; pageNum <= endPage && pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
 
       // Base viewport at scale=1
@@ -1697,20 +1701,26 @@ async function uploadVendorPO(input) {
   const files = Array.from(input.files);
   if (!files.length) return;
   const statusEl = document.getElementById('vpoUploadStatus');
-  const results = [];
+  const allRows = [];
 
   for (const file of files) {
     const fd = new FormData();
     fd.append('file', file);
     try {
       const result = await fetch(API + '/api/vendor-pos/upload', { method: 'POST', body: fd }).then(r => r.json());
-      if (result.ok) {
-        results.push({ name: file.name, ok: true, po: result.po, vessel: result.vessel, vendor: result.vendor });
+      if (result.ok && result.results) {
+        // Multi-page: result.results is array of per-PO results
+        result.results.forEach(r => allRows.push({ ok: true, po: r.po, vessel: r.vessel, vendor: r.vendor }));
+        if (result.errors && result.errors.length) {
+          result.errors.forEach(e => allRows.push({ ok: false, po: e.po || '?', error: e.error }));
+        }
+      } else if (result.ok) {
+        allRows.push({ ok: true, po: result.po, vessel: result.vessel, vendor: result.vendor });
       } else {
-        results.push({ name: file.name, ok: false, error: result.error });
+        allRows.push({ ok: false, name: file.name, error: result.error });
       }
     } catch {
-      results.push({ name: file.name, ok: false, error: '上传失败' });
+      allRows.push({ ok: false, name: file.name, error: '上传失败' });
     }
   }
 
@@ -1718,14 +1728,13 @@ async function uploadVendorPO(input) {
   renderAdminVendorPOList();
   updateHomeVendorPOSub();
 
-  // Show results
-  if (statusEl) {
-    statusEl.innerHTML = '<div class="card">' + results.map(r => `
+  if (statusEl && allRows.length) {
+    statusEl.innerHTML = '<div class="card">' + allRows.map(r => `
       <div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:flex-start;gap:10px">
         <span style="font-size:16px;flex-shrink:0">${r.ok ? '✅' : '❌'}</span>
         <div style="min-width:0">
-          <div style="font-size:13px;font-weight:500;color:var(--text)">${r.ok ? r.po : r.name}</div>
-          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.ok ? r.vessel + ' · ' + r.vendor : r.error}</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${r.ok ? r.po : (r.po || r.name || '未知')}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.ok ? (r.vessel || '') + ' · ' + (r.vendor || '') : r.error}</div>
         </div>
       </div>`).join('') + '</div>';
   }
