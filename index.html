@@ -45,10 +45,6 @@ body{display:flex;flex-direction:column;max-width:480px;margin:0 auto}
 
 .content{flex:1;overflow-y:auto;padding:0 0 calc(70px + var(--safe-bottom))}
 .ptr-indicator{display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;transition:height .2s;font-size:13px;color:var(--text-2);gap:8px}
-.draw-toolbar{position:sticky;top:56px;z-index:50;background:var(--surface);border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:6px;padding:8px 12px}
-.draw-btn{border:none;background:var(--bg);border-radius:var(--radius);padding:6px 10px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500;display:flex;align-items:center;gap:4px}
-.draw-btn.active{background:var(--green-light);color:var(--green)}
-.draw-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
 .ptr-indicator.visible{height:48px}
 .ptr-spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
 .ptr-spinner.done{border-top-color:var(--green);animation:none;border-color:var(--green)}
@@ -1642,29 +1638,7 @@ async function openVendorPODetail(po) {
       await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
     }
 
-    // Wrap canvas in relative container and add drawing overlay
-    const pdfCanvas = el.querySelector('canvas');
-    if (pdfCanvas) {
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'position:relative;display:block;width:100%;';
-      pdfCanvas.parentNode.insertBefore(wrapper, pdfCanvas);
-      wrapper.appendChild(pdfCanvas);
-
-      const drawCanvas = document.createElement('canvas');
-      drawCanvas.className = 'draw-canvas';
-      drawCanvas.width  = pdfCanvas.width;
-      drawCanvas.height = pdfCanvas.height;
-      drawCanvas.style.opacity = '1';
-      wrapper.appendChild(drawCanvas);
-      initDrawing(drawCanvas);
-    }
-
-    // Add toolbar to topbar right
-    document.getElementById('topbarRight').innerHTML =
-      `<button class="draw-btn active" id="drawPenBtn" onclick="setDrawMode('pen')" title="画笔">✏️</button>` +
-      `<button class="draw-btn" id="drawEraserBtn" onclick="setDrawMode('eraser')" title="橡皮">🧹</button>` +
-      `<button class="draw-btn" onclick="clearDrawing()" title="清除全部">🗑️</button>`;
-
+    // Enable pinch-to-zoom via CSS transform
     enablePinchZoom(el);
   } catch(err) {
     el.innerHTML = `<div style="text-align:center;padding:40px 16px;color:var(--red);font-size:14px">⚠️ PDF 载入失败<br><span style="font-size:12px;color:var(--text-2)">${err.message}</span></div>`;
@@ -1818,104 +1792,6 @@ async function deleteVendorPO(po) {
   } catch { showToast('删除失败'); }
 }
 
-
-// ─── DRAWING ON PDF ──────────────────────────────────────
-let _drawCanvas = null;
-let _drawCtx    = null;
-let _drawMode   = 'pen';  // 'pen' | 'eraser'
-let _drawing    = false;
-let _lastX = 0, _lastY = 0;
-
-function initDrawing(canvas) {
-  _drawCanvas = canvas;
-  _drawCtx    = canvas.getContext('2d');
-  _drawCtx.strokeStyle = '#E24B4A';
-  _drawCtx.lineWidth   = canvas.width * 0.006;  // ~0.6% of canvas width
-  _drawCtx.lineCap     = 'round';
-  _drawCtx.lineJoin    = 'round';
-
-  // Touch events
-  canvas.addEventListener('touchstart', e => {
-    if (_drawMode !== 'pen' && _drawMode !== 'eraser') return;
-    if (e.touches.length !== 1) return;
-    e.preventDefault();
-    _drawing = true;
-    const pt = getTouchPos(canvas, e.touches[0]);
-    _lastX = pt.x; _lastY = pt.y;
-    _drawCtx.beginPath();
-    _drawCtx.moveTo(pt.x, pt.y);
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', e => {
-    if (!_drawing || e.touches.length !== 1) return;
-    e.preventDefault();
-    const pt = getTouchPos(canvas, e.touches[0]);
-    if (_drawMode === 'eraser') {
-      const r = canvas.width * 0.04;
-      _drawCtx.clearRect(pt.x - r, pt.y - r, r * 2, r * 2);
-    } else {
-      _drawCtx.lineTo(pt.x, pt.y);
-      _drawCtx.stroke();
-      _drawCtx.beginPath();
-      _drawCtx.moveTo(pt.x, pt.y);
-    }
-    _lastX = pt.x; _lastY = pt.y;
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', () => { _drawing = false; });
-
-  // Mouse events (desktop)
-  canvas.addEventListener('mousedown', e => {
-    _drawing = true;
-    const pt = getMousePos(canvas, e);
-    _lastX = pt.x; _lastY = pt.y;
-    _drawCtx.beginPath();
-    _drawCtx.moveTo(pt.x, pt.y);
-  });
-  canvas.addEventListener('mousemove', e => {
-    if (!_drawing) return;
-    const pt = getMousePos(canvas, e);
-    if (_drawMode === 'eraser') {
-      const r = canvas.width * 0.04;
-      _drawCtx.clearRect(pt.x - r, pt.y - r, r * 2, r * 2);
-    } else {
-      _drawCtx.lineTo(pt.x, pt.y);
-      _drawCtx.stroke();
-      _drawCtx.beginPath();
-      _drawCtx.moveTo(pt.x, pt.y);
-    }
-  });
-  canvas.addEventListener('mouseup', () => { _drawing = false; });
-}
-
-function getTouchPos(canvas, touch) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
-  return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
-}
-function getMousePos(canvas, e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
-  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
-}
-
-function setDrawMode(mode) {
-  _drawMode = mode;
-  document.getElementById('drawPenBtn')?.classList.toggle('active', mode === 'pen');
-  document.getElementById('drawEraserBtn')?.classList.toggle('active', mode === 'eraser');
-  if (_drawCtx) {
-    _drawCtx.strokeStyle = '#E24B4A';
-    _drawCtx.lineWidth   = _drawCanvas ? _drawCanvas.width * 0.006 : 4;
-  }
-}
-
-function clearDrawing() {
-  if (_drawCanvas && _drawCtx) {
-    _drawCtx.clearRect(0, 0, _drawCanvas.width, _drawCanvas.height);
-  }
-}
 
 </script>
 </body>
